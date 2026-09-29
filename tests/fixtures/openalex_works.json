@@ -1,0 +1,3016 @@
+{
+ "meta": {
+  "count": 2058,
+  "db_response_time_ms": 26,
+  "page": null,
+  "per_page": 3,
+  "next_cursor": "Ils5Ni4wLCAxLCAnaHR0cHM6Ly9vcGVuYWxleC5vcmcvVzcyMDQ5MTQ2OTcnXSI=",
+  "groups_count": null,
+  "x_query": {
+   "oql": "works where date >= (2026-09-01)\n  and field is (fields/25)\n  and date <= (2026-09-01)",
+   "oqo": {
+    "get_rows": "works",
+    "filter_rows": [
+     {
+      "column_id": "from_publication_date",
+      "value": "2026-09-01"
+     },
+     {
+      "column_id": "primary_topic.field.id",
+      "value": "fields/25"
+     },
+     {
+      "column_id": "to_publication_date",
+      "value": "2026-09-01"
+     }
+    ]
+   },
+   "url": "/works?filter=from_publication_date:2026-09-01,primary_topic.field.id:fields%2F25,to_publication_date:2026-09-01&per_page=3&cursor=%2A"
+  },
+  "cost_usd": 0.0001
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W4412399867",
+   "doi": "https://doi.org/10.1021/acsaem.6c00968",
+   "title": "Mechanochemical Activation of Nickel Oxide: A Pivotal Step in the Process Chain Enabling Binder-Free Anodes for Alkaline Water Electrolysis",
+   "display_name": "Mechanochemical Activation of Nickel Oxide: A Pivotal Step in the Process Chain Enabling Binder-Free Anodes for Alkaline Water Electrolysis",
+   "publication_year": 2026,
+   "publication_date": "2026-09-01",
+   "ids": {
+    "openalex": "https://openalex.org/W4412399867",
+    "doi": "https://doi.org/10.1021/acsaem.6c00968"
+   },
+   "language": "en",
+   "primary_location": {
+    "id": "doi:10.1021/acsaem.6c00968",
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.1021/acsaem.6c00968",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S4210188958",
+     "display_name": "ACS Applied Energy Materials",
+     "issn_l": "2574-0962",
+     "issn": [
+      "2574-0962"
+     ],
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": true,
+     "host_organization": "https://openalex.org/P4310320006",
+     "host_organization_name": "American Chemical Society",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320006"
+     ],
+     "host_organization_lineage_names": [
+      "American Chemical Society"
+     ],
+     "type": "journal"
+    },
+    "license": null,
+    "license_id": null,
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "ACS Applied Energy Materials",
+    "raw_type": "journal-article"
+   },
+   "type": "article",
+   "indexed_in": [
+    "crossref"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "gold",
+    "oa_url": "https://engrxiv.org/preprint/download/4835/8313/6891",
+    "any_repository_has_fulltext": null
+   },
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5052683041",
+      "display_name": "Mohit Chatwani",
+      "orcid": "https://orcid.org/0009-0007-3471-6049"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Mohit Chatwani",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+      "University of Duisburg-Essen"
+     ],
+     "raw_orcid": "https://orcid.org/0009-0007-3471-6049",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      },
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5041070012",
+      "display_name": "Adarsh Jain",
+      "orcid": "https://orcid.org/0009-0001-6199-8340"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Adarsh Jain",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0009-0001-6199-8340",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5006249717",
+      "display_name": "Christian Marcks",
+      "orcid": "https://orcid.org/0000-0003-3618-4246"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I887968799",
+       "display_name": "RWTH Aachen University",
+       "ror": "https://ror.org/04xfq0f34",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I887968799"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Christian Marcks",
+     "raw_affiliation_strings": [
+      "RWTH Aachen University , , Forckenbeckstraße 51 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0003-3618-4246",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "RWTH Aachen University , , Forckenbeckstraße 51 , ,",
+       "institution_ids": [
+        "https://openalex.org/I887968799"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5052449351",
+      "display_name": "Jacob Johny",
+      "orcid": "https://orcid.org/0000-0002-5941-6348"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210110444",
+       "display_name": "Max Planck Institute for Chemical Energy Conversion",
+       "ror": "https://ror.org/01y9arx16",
+       "country_code": "DE",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I149899117",
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Jacob Johny",
+     "raw_affiliation_strings": [
+      "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0002-5941-6348",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,",
+       "institution_ids": [
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5114523730",
+      "display_name": "Lars Grebener",
+      "orcid": null
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Lars Grebener",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5101519279",
+      "display_name": "Hao Yun",
+      "orcid": "https://orcid.org/0000-0001-8033-6441"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Hao Yun",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5101771296",
+      "display_name": "Ali Raza Khan",
+      "orcid": "https://orcid.org/0009-0002-5779-4959"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210110444",
+       "display_name": "Max Planck Institute for Chemical Energy Conversion",
+       "ror": "https://ror.org/01y9arx16",
+       "country_code": "DE",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I149899117",
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Ali Raza Khan",
+     "raw_affiliation_strings": [
+      "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0009-0001-8981-0944",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,",
+       "institution_ids": [
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5019229511",
+      "display_name": "Georg Bendt",
+      "orcid": "https://orcid.org/0000-0003-2966-4348"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Georg Bendt",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Universitätsstaße 7 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Universitätsstaße 7 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5082911037",
+      "display_name": "Stefan Romeis",
+      "orcid": "https://orcid.org/0000-0003-1918-2580"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210143637",
+       "display_name": "Dräger (Germany)",
+       "ror": "https://ror.org/0415p9s42",
+       "country_code": "DE",
+       "type": "company",
+       "lineage": [
+        "https://openalex.org/I4210143637"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Stefan Romeis",
+     "raw_affiliation_strings": [
+      "Siegwerk Druckfarben AG & Co. Kgaa , Alfred-Keller-Str. 55 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Siegwerk Druckfarben AG & Co. Kgaa , Alfred-Keller-Str. 55 , ,",
+       "institution_ids": [
+        "https://openalex.org/I4210143637"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5026566541",
+      "display_name": "Viktor Čolić",
+      "orcid": "https://orcid.org/0000-0003-1118-5592"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210110444",
+       "display_name": "Max Planck Institute for Chemical Energy Conversion",
+       "ror": "https://ror.org/01y9arx16",
+       "country_code": "DE",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I149899117",
+        "https://openalex.org/I4210110444"
+       ]
+      },
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Viktor Čolić",
+     "raw_affiliation_strings": [
+      "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,",
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0003-1118-5592",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,",
+       "institution_ids": [
+        "https://openalex.org/I4210110444"
+       ]
+      },
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5061166184",
+      "display_name": "Marc F. Tesch",
+      "orcid": "https://orcid.org/0000-0001-7480-7200"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210110444",
+       "display_name": "Max Planck Institute for Chemical Energy Conversion",
+       "ror": "https://ror.org/01y9arx16",
+       "country_code": "DE",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I149899117",
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Marc Frederic Tesch",
+     "raw_affiliation_strings": [
+      "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Max Planck Institute for Chemical Energy Conversion (MPI-CEC) , , Stiftstraße 34-36 , ,",
+       "institution_ids": [
+        "https://openalex.org/I4210110444"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5057402984",
+      "display_name": "Anna K. Mechler",
+      "orcid": "https://orcid.org/0000-0002-0491-514X"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I171892758",
+       "display_name": "Forschungszentrum Jülich",
+       "ror": "https://ror.org/02nv7yv05",
+       "country_code": "DE",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I1305996414",
+        "https://openalex.org/I171892758"
+       ]
+      },
+      {
+       "id": "https://openalex.org/I887968799",
+       "display_name": "RWTH Aachen University",
+       "ror": "https://ror.org/04xfq0f34",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I887968799"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Anna K. Mechler",
+     "raw_affiliation_strings": [
+      "Forschungszentrum Jülich GmbH , , Wilhelm-Johnen-Straße , ,",
+      "RWTH Aachen University , , Forckenbeckstraße 51 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0002-0491-514X",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Forschungszentrum Jülich GmbH , , Wilhelm-Johnen-Straße , ,",
+       "institution_ids": [
+        "https://openalex.org/I171892758"
+       ]
+      },
+      {
+       "raw_affiliation_string": "RWTH Aachen University , , Forckenbeckstraße 51 , ,",
+       "institution_ids": [
+        "https://openalex.org/I887968799"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5025930612",
+      "display_name": "Vineetha Vinayakumar",
+      "orcid": "https://orcid.org/0000-0002-6707-8051"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Vineetha Vinayakumar",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "last",
+     "author": {
+      "id": "https://openalex.org/A5062824606",
+      "display_name": "Doris Segets",
+      "orcid": "https://orcid.org/0000-0003-3102-2934"
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I62318514",
+       "display_name": "University of Duisburg-Essen",
+       "ror": "https://ror.org/04mz5ra38",
+       "country_code": "DE",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ],
+     "countries": [
+      "DE"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Doris Segets",
+     "raw_affiliation_strings": [
+      "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0003-3102-2934",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "University of Duisburg-Essen (UDE) , , Carl-Benz-Straße 199 , ,",
+       "institution_ids": [
+        "https://openalex.org/I62318514"
+       ]
+      }
+     ]
+    }
+   ],
+   "institutions": [],
+   "countries_distinct_count": 1,
+   "institutions_distinct_count": 5,
+   "corresponding_author_ids": [],
+   "corresponding_institution_ids": [],
+   "apc_list": {
+    "value": 4500,
+    "currency": "USD",
+    "value_usd": 4500
+   },
+   "apc_paid": {
+    "value": 4500,
+    "currency": "USD",
+    "value_usd": 4500
+   },
+   "fwci": 3.7936,
+   "has_fulltext": true,
+   "cited_by_count": 2,
+   "citation_normalized_percentile": {
+    "value": 0.89508281,
+    "is_in_top_1_percent": false,
+    "is_in_top_10_percent": false
+   },
+   "cited_by_percentile_year": {
+    "min": 96,
+    "max": 98
+   },
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T10310",
+    "display_name": "Corrosion Behavior and Inhibition",
+    "score": 0.9911999702453613,
+    "subfield": {
+     "id": "https://openalex.org/subfields/2505",
+     "display_name": "Materials Chemistry"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/25",
+     "display_name": "Materials Science"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/3",
+     "display_name": "Physical Sciences"
+    }
+   },
+   "topics": [
+    {
+     "id": "https://openalex.org/T10310",
+     "display_name": "Corrosion Behavior and Inhibition",
+     "score": 0.9911999702453613,
+     "subfield": {
+      "id": "https://openalex.org/subfields/2505",
+      "display_name": "Materials Chemistry"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/25",
+      "display_name": "Materials Science"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    },
+    {
+     "id": "https://openalex.org/T10409",
+     "display_name": "Fuel Cells and Related Materials",
+     "score": 0.9527000188827515,
+     "subfield": {
+      "id": "https://openalex.org/subfields/2208",
+      "display_name": "Electrical and Electronic Engineering"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/22",
+      "display_name": "Engineering"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    },
+    {
+     "id": "https://openalex.org/T10030",
+     "display_name": "Electrocatalysts for Energy Conversion",
+     "score": 0.9409999847412109,
+     "subfield": {
+      "id": "https://openalex.org/subfields/2105",
+      "display_name": "Renewable Energy, Sustainability and the Environment"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/21",
+      "display_name": "Energy"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    }
+   ],
+   "keywords": [
+    {
+     "id": "https://openalex.org/keywords/electrolysis",
+     "display_name": "Electrolysis",
+     "score": 0.755282998085022
+    },
+    {
+     "id": "https://openalex.org/keywords/anode",
+     "display_name": "Anode",
+     "score": 0.6734767556190491
+    },
+    {
+     "id": "https://openalex.org/keywords/nickel-oxide",
+     "display_name": "Nickel oxide",
+     "score": 0.6476247906684875
+    },
+    {
+     "id": "https://openalex.org/keywords/nickel",
+     "display_name": "Nickel",
+     "score": 0.6467504501342773
+    },
+    {
+     "id": "https://openalex.org/keywords/process",
+     "display_name": "Process (computing)",
+     "score": 0.546762228012085
+    },
+    {
+     "id": "https://openalex.org/keywords/alkaline-water-electrolysis",
+     "display_name": "Alkaline water electrolysis",
+     "score": 0.5374401807785034
+    },
+    {
+     "id": "https://openalex.org/keywords/oxide",
+     "display_name": "Oxide",
+     "score": 0.5136248469352722
+    },
+    {
+     "id": "https://openalex.org/keywords/materials-science",
+     "display_name": "Materials science",
+     "score": 0.4587320387363434
+    },
+    {
+     "id": "https://openalex.org/keywords/chemical-engineering",
+     "display_name": "Chemical engineering",
+     "score": 0.4520183205604553
+    },
+    {
+     "id": "https://openalex.org/keywords/chain",
+     "display_name": "Chain (unit)",
+     "score": 0.4252578914165497
+    },
+    {
+     "id": "https://openalex.org/keywords/electrolytic-process",
+     "display_name": "Electrolytic process",
+     "score": 0.41730996966362
+    },
+    {
+     "id": "https://openalex.org/keywords/inorganic-chemistry",
+     "display_name": "Inorganic chemistry",
+     "score": 0.34359443187713623
+    },
+    {
+     "id": "https://openalex.org/keywords/chemistry",
+     "display_name": "Chemistry",
+     "score": 0.31950610876083374
+    },
+    {
+     "id": "https://openalex.org/keywords/metallurgy",
+     "display_name": "Metallurgy",
+     "score": 0.30696529150009155
+    },
+    {
+     "id": "https://openalex.org/keywords/computer-science",
+     "display_name": "Computer science",
+     "score": 0.11176574230194092
+    },
+    {
+     "id": "https://openalex.org/keywords/electrolyte",
+     "display_name": "Electrolyte",
+     "score": 0.1001422107219696
+    },
+    {
+     "id": "https://openalex.org/keywords/electrode",
+     "display_name": "Electrode",
+     "score": 0.09425574541091919
+    },
+    {
+     "id": "https://openalex.org/keywords/engineering",
+     "display_name": "Engineering",
+     "score": 0.045852452516555786
+    }
+   ],
+   "concepts": [
+    {
+     "id": "https://openalex.org/C163127949",
+     "wikidata": "https://www.wikidata.org/wiki/Q64403",
+     "display_name": "Electrolysis",
+     "level": 4,
+     "score": 0.755282998085022
+    },
+    {
+     "id": "https://openalex.org/C89395315",
+     "wikidata": "https://www.wikidata.org/wiki/Q181232",
+     "display_name": "Anode",
+     "level": 3,
+     "score": 0.6734767556190491
+    },
+    {
+     "id": "https://openalex.org/C2776652806",
+     "wikidata": "https://www.wikidata.org/wiki/Q1985706",
+     "display_name": "Nickel oxide",
+     "level": 3,
+     "score": 0.6476247906684875
+    },
+    {
+     "id": "https://openalex.org/C504270822",
+     "wikidata": "https://www.wikidata.org/wiki/Q744",
+     "display_name": "Nickel",
+     "level": 2,
+     "score": 0.6467504501342773
+    },
+    {
+     "id": "https://openalex.org/C98045186",
+     "wikidata": "https://www.wikidata.org/wiki/Q205663",
+     "display_name": "Process (computing)",
+     "level": 2,
+     "score": 0.546762228012085
+    },
+    {
+     "id": "https://openalex.org/C71392577",
+     "wikidata": "https://www.wikidata.org/wiki/Q16002538",
+     "display_name": "Alkaline water electrolysis",
+     "level": 5,
+     "score": 0.5374401807785034
+    },
+    {
+     "id": "https://openalex.org/C2779851234",
+     "wikidata": "https://www.wikidata.org/wiki/Q50690",
+     "display_name": "Oxide",
+     "level": 2,
+     "score": 0.5136248469352722
+    },
+    {
+     "id": "https://openalex.org/C192562407",
+     "wikidata": "https://www.wikidata.org/wiki/Q228736",
+     "display_name": "Materials science",
+     "level": 0,
+     "score": 0.4587320387363434
+    },
+    {
+     "id": "https://openalex.org/C42360764",
+     "wikidata": "https://www.wikidata.org/wiki/Q83588",
+     "display_name": "Chemical engineering",
+     "level": 1,
+     "score": 0.4520183205604553
+    },
+    {
+     "id": "https://openalex.org/C199185054",
+     "wikidata": "https://www.wikidata.org/wiki/Q552299",
+     "display_name": "Chain (unit)",
+     "level": 2,
+     "score": 0.4252578914165497
+    },
+    {
+     "id": "https://openalex.org/C70635819",
+     "wikidata": "https://www.wikidata.org/wiki/Q5358064",
+     "display_name": "Electrolytic process",
+     "level": 5,
+     "score": 0.41730996966362
+    },
+    {
+     "id": "https://openalex.org/C179104552",
+     "wikidata": "https://www.wikidata.org/wiki/Q11165",
+     "display_name": "Inorganic chemistry",
+     "level": 1,
+     "score": 0.34359443187713623
+    },
+    {
+     "id": "https://openalex.org/C185592680",
+     "wikidata": "https://www.wikidata.org/wiki/Q2329",
+     "display_name": "Chemistry",
+     "level": 0,
+     "score": 0.31950610876083374
+    },
+    {
+     "id": "https://openalex.org/C191897082",
+     "wikidata": "https://www.wikidata.org/wiki/Q11467",
+     "display_name": "Metallurgy",
+     "level": 1,
+     "score": 0.30696529150009155
+    },
+    {
+     "id": "https://openalex.org/C41008148",
+     "wikidata": "https://www.wikidata.org/wiki/Q21198",
+     "display_name": "Computer science",
+     "level": 0,
+     "score": 0.11176574230194092
+    },
+    {
+     "id": "https://openalex.org/C68801617",
+     "wikidata": "https://www.wikidata.org/wiki/Q162908",
+     "display_name": "Electrolyte",
+     "level": 3,
+     "score": 0.1001422107219696
+    },
+    {
+     "id": "https://openalex.org/C17525397",
+     "wikidata": "https://www.wikidata.org/wiki/Q176140",
+     "display_name": "Electrode",
+     "level": 2,
+     "score": 0.09425574541091919
+    },
+    {
+     "id": "https://openalex.org/C127413603",
+     "wikidata": "https://www.wikidata.org/wiki/Q11023",
+     "display_name": "Engineering",
+     "level": 0,
+     "score": 0.045852452516555786
+    },
+    {
+     "id": "https://openalex.org/C111919701",
+     "wikidata": "https://www.wikidata.org/wiki/Q9135",
+     "display_name": "Operating system",
+     "level": 1,
+     "score": 0.0
+    },
+    {
+     "id": "https://openalex.org/C147789679",
+     "wikidata": "https://www.wikidata.org/wiki/Q11372",
+     "display_name": "Physical chemistry",
+     "level": 1,
+     "score": 0.0
+    },
+    {
+     "id": "https://openalex.org/C1276947",
+     "wikidata": "https://www.wikidata.org/wiki/Q333",
+     "display_name": "Astronomy",
+     "level": 1,
+     "score": 0.0
+    },
+    {
+     "id": "https://openalex.org/C121332964",
+     "wikidata": "https://www.wikidata.org/wiki/Q413",
+     "display_name": "Physics",
+     "level": 0,
+     "score": 0.0
+    }
+   ],
+   "mesh": [],
+   "locations_count": 2,
+   "locations": [
+    {
+     "id": "doi:10.1021/acsaem.6c00968",
+     "is_oa": false,
+     "landing_page_url": "https://doi.org/10.1021/acsaem.6c00968",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4210188958",
+      "display_name": "ACS Applied Energy Materials",
+      "issn_l": "2574-0962",
+      "issn": [
+       "2574-0962"
+      ],
+      "is_oa": false,
+      "is_in_doaj": false,
+      "is_core": true,
+      "host_organization": "https://openalex.org/P4310320006",
+      "host_organization_name": "American Chemical Society",
+      "host_organization_lineage": [
+       "https://openalex.org/P4310320006"
+      ],
+      "host_organization_lineage_names": [
+       "American Chemical Society"
+      ],
+      "type": "journal"
+     },
+     "license": null,
+     "license_id": null,
+     "version": "publishedVersion",
+     "is_accepted": true,
+     "is_published": true,
+     "raw_source_name": "ACS Applied Energy Materials",
+     "raw_type": "journal-article"
+    },
+    {
+     "id": "doi:10.31224/4835",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.31224/4835",
+     "pdf_url": "https://engrxiv.org/preprint/download/4835/8313/6891",
+     "source": null,
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": "acceptedVersion",
+     "is_accepted": true,
+     "is_published": false,
+     "raw_source_name": null,
+     "raw_type": "posted-content"
+    }
+   ],
+   "best_oa_location": {
+    "id": "doi:10.31224/4835",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.31224/4835",
+    "pdf_url": "https://engrxiv.org/preprint/download/4835/8313/6891",
+    "source": null,
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": "acceptedVersion",
+    "is_accepted": true,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "posted-content"
+   },
+   "sustainable_development_goals": [],
+   "awards": [
+    {
+     "id": "https://openalex.org/G1115906470",
+     "display_name": null,
+     "funder_award_id": "390919832",
+     "funder_id": "https://openalex.org/F4320322434",
+     "funder_display_name": "Max-Planck-Gesellschaft"
+    },
+    {
+     "id": "https://openalex.org/G1354695261",
+     "display_name": "EXC 2186: Das Fuel Science Center – Adaptive Umwandlungssysteme für erneuerbare Energie und Kohlenstoffquellen",
+     "funder_award_id": "390919832",
+     "funder_id": "https://openalex.org/F4320320879",
+     "funder_display_name": "Deutsche Forschungsgemeinschaft"
+    },
+    {
+     "id": "https://openalex.org/G1933589033",
+     "display_name": null,
+     "funder_award_id": "03HY105F",
+     "funder_id": "https://openalex.org/F4320321114",
+     "funder_display_name": "Bundesministerium für Bildung und Forschung"
+    },
+    {
+     "id": "https://openalex.org/G426044762",
+     "display_name": null,
+     "funder_award_id": "Exzellenzcluster2186",
+     "funder_id": "https://openalex.org/F4320320879",
+     "funder_display_name": "Deutsche Forschungsgemeinschaft"
+    },
+    {
+     "id": "https://openalex.org/G8242171145",
+     "display_name": null,
+     "funder_award_id": "03HY105E",
+     "funder_id": "https://openalex.org/F4320321114",
+     "funder_display_name": "Bundesministerium für Bildung und Forschung"
+    },
+    {
+     "id": "https://openalex.org/G979174676",
+     "display_name": null,
+     "funder_award_id": "03HY105A",
+     "funder_id": "https://openalex.org/F4320321114",
+     "funder_display_name": "Bundesministerium für Bildung und Forschung"
+    }
+   ],
+   "funders": [
+    {
+     "id": "https://openalex.org/F4320320879",
+     "display_name": "Deutsche Forschungsgemeinschaft",
+     "ror": "https://ror.org/018mejw64"
+    },
+    {
+     "id": "https://openalex.org/F4320321114",
+     "display_name": "Bundesministerium für Bildung und Forschung",
+     "ror": "https://ror.org/04pz7b180"
+    },
+    {
+     "id": "https://openalex.org/F4320322434",
+     "display_name": "Max-Planck-Gesellschaft",
+     "ror": "https://ror.org/01hhn8329"
+    },
+    {
+     "id": "https://openalex.org/F4320325052",
+     "display_name": "Universität Duisburg-Essen",
+     "ror": "https://ror.org/04mz5ra38"
+    },
+    {
+     "id": "https://openalex.org/F4320336949",
+     "display_name": "Interdisciplinary Center for Analytics on the Nanoscale, University of Duisburg-Essen",
+     "ror": null
+    }
+   ],
+   "has_content": {
+    "grobid_xml": true,
+    "pdf": true
+   },
+   "content_urls": {
+    "pdf": "https://content.openalex.org/works/W4412399867.pdf",
+    "grobid_xml": "https://content.openalex.org/works/W4412399867.grobid-xml"
+   },
+   "referenced_works_count": 0,
+   "referenced_works": [],
+   "related_works": [
+    "https://openalex.org/W2376063141",
+    "https://openalex.org/W2364518159",
+    "https://openalex.org/W2374778007",
+    "https://openalex.org/W2078776357",
+    "https://openalex.org/W2372240524",
+    "https://openalex.org/W4388968288",
+    "https://openalex.org/W2887541025",
+    "https://openalex.org/W1583651337",
+    "https://openalex.org/W2982614508",
+    "https://openalex.org/W3115378661"
+   ],
+   "abstract_inverted_index": {
+    "Abstract": [
+     0
+    ],
+    "Sustainable": [
+     1
+    ],
+    "hydrogen": [
+     2
+    ],
+    "production": [
+     3
+    ],
+    "via": [
+     4
+    ],
+    "alkaline": [
+     5
+    ],
+    "water": [
+     6
+    ],
+    "electrolysis": [
+     7
+    ],
+    "demands": [
+     8
+    ],
+    "robust": [
+     9
+    ],
+    "electrocatalysts": [
+     10
+    ],
+    "for": [
+     11,
+     158
+    ],
+    "the": [
+     12,
+     39,
+     59,
+     136
+    ],
+    "oxygen": [
+     13
+    ],
+    "evolution": [
+     14
+    ],
+    "reaction": [
+     15
+    ],
+    "(OER)": [
+     16
+    ],
+    "that": [
+     17
+    ],
+    "combine": [
+     18
+    ],
+    "performance": [
+     19
+    ],
+    "with": [
+     20,
+     66,
+     101
+    ],
+    "scalability.": [
+     21
+    ],
+    "We": [
+     22,
+     110
+    ],
+    "address": [
+     23
+    ],
+    "this": [
+     24,
+     112
+    ],
+    "by": [
+     25
+    ],
+    "mechanochemical": [
+     26,
+     121
+    ],
+    "activation": [
+     27,
+     122
+    ],
+    "of": [
+     28,
+     41,
+     61,
+     138
+    ],
+    "nickel": [
+     29,
+     88
+    ],
+    "oxide": [
+     30
+    ],
+    "(NiO)": [
+     31
+    ],
+    "to": [
+     32,
+     75,
+     114
+    ],
+    "fabricate": [
+     33
+    ],
+    "binder-free": [
+     34,
+     108,
+     156
+    ],
+    "anodes.": [
+     35,
+     109
+    ],
+    "First,": [
+     36
+    ],
+    "we": [
+     37
+    ],
+    "investigated": [
+     38
+    ],
+    "effects": [
+     40
+    ],
+    "planetary": [
+     42
+    ],
+    "ball": [
+     43
+    ],
+    "milling": [
+     44
+    ],
+    "(PBM),": [
+     45
+    ],
+    "which": [
+     46
+    ],
+    "decreased": [
+     47
+    ],
+    "crystallite": [
+     48
+    ],
+    "size,": [
+     49
+    ],
+    "increased": [
+     50
+    ],
+    "specific": [
+     51
+    ],
+    "surface": [
+     52,
+     62
+    ],
+    "area,": [
+     53
+    ],
+    "elevated": [
+     54
+    ],
+    "Ni3+": [
+     55
+    ],
+    "content,": [
+     56
+    ],
+    "and": [
+     57,
+     123,
+     150
+    ],
+    "enhanced": [
+     58
+    ],
+    "amount": [
+     60
+    ],
+    "hydroxyl": [
+     63
+    ],
+    "groups.": [
+     64
+    ],
+    "PBM": [
+     65
+    ],
+    "larger": [
+     67
+    ],
+    "beads": [
+     68
+    ],
+    "induced": [
+     69
+    ],
+    "more": [
+     70
+    ],
+    "pronounced": [
+     71
+    ],
+    "structural": [
+     72
+    ],
+    "transformations": [
+     73
+    ],
+    "due": [
+     74
+    ],
+    "higher": [
+     76,
+     151
+    ],
+    "impact": [
+     77
+    ],
+    "forces.": [
+     78
+    ],
+    "Mechanochemically": [
+     79
+    ],
+    "activated": [
+     80
+    ],
+    "NiO": [
+     81
+    ],
+    "showed": [
+     82
+    ],
+    "a": [
+     83,
+     155
+    ],
+    "lower": [
+     84,
+     146
+    ],
+    "overpotential": [
+     85,
+     147
+    ],
+    "than": [
+     86
+    ],
+    "bare": [
+     87
+    ],
+    "(365": [
+     89
+    ],
+    "vs.": [
+     90
+    ],
+    "377": [
+     91
+    ],
+    "mV": [
+     92
+    ],
+    "at": [
+     93
+    ],
+    "100": [
+     94
+    ],
+    "mA": [
+     95
+    ],
+    "cm–2": [
+     96
+    ],
+    "in": [
+     97,
+     127,
+     135
+    ],
+    "1": [
+     98
+    ],
+    "M": [
+     99
+    ],
+    "KOH)": [
+     100
+    ],
+    "excellent": [
+     102
+    ],
+    "particle": [
+     103
+    ],
+    "cohesion,": [
+     104
+    ],
+    "enabling": [
+     105,
+     120
+    ],
+    "mechanically": [
+     106
+    ],
+    "stable,": [
+     107
+    ],
+    "translated": [
+     111
+    ],
+    "approach": [
+     113
+    ],
+    "continuously": [
+     115
+    ],
+    "operable": [
+     116
+    ],
+    "stirred": [
+     117
+    ],
+    "media": [
+     118
+    ],
+    "milling,": [
+     119
+    ],
+    "concurrent": [
+     124
+    ],
+    "ink": [
+     125
+    ],
+    "formulation": [
+     126
+    ],
+    "isopropanol,": [
+     128
+    ],
+    "eliminating": [
+     129
+    ],
+    "intermediate": [
+     130
+    ],
+    "powder": [
+     131
+    ],
+    "drying": [
+     132
+    ],
+    "as": [
+     133
+    ],
+    "needed": [
+     134
+    ],
+    "case": [
+     137
+    ],
+    "PBM.": [
+     139
+    ],
+    "The": [
+     140
+    ],
+    "resulting": [
+     141
+    ],
+    "anodes": [
+     142
+    ],
+    "exhibited": [
+     143
+    ],
+    "an": [
+     144
+    ],
+    "even": [
+     145
+    ],
+    "(343": [
+     148
+    ],
+    "mV)": [
+     149
+    ],
+    "mechanical": [
+     152
+    ],
+    "robustness,": [
+     153
+    ],
+    "offering": [
+     154
+    ],
+    "pathway": [
+     157
+    ],
+    "OER": [
+     159
+    ],
+    "electrode": [
+     160
+    ],
+    "fabrication.": [
+     161
+    ]
+   },
+   "counts_by_year": [
+    {
+     "year": 2026,
+     "cited_by_count": 2
+    }
+   ],
+   "updated_date": "2026-09-05T08:02:43.246662",
+   "created_date": "2025-10-10T00:00:00"
+  },
+  {
+   "id": "https://openalex.org/W7204886337",
+   "doi": "https://doi.org/10.5281/zenodo.22236848",
+   "title": "Golden-Oriented Lens Diagram(GOLD): Sixfold Geometry, Five-Dimensional Comparison, and Trace-Bearing Paths",
+   "display_name": "Golden-Oriented Lens Diagram(GOLD): Sixfold Geometry, Five-Dimensional Comparison, and Trace-Bearing Paths",
+   "publication_year": 2026,
+   "publication_date": "2026-09-01",
+   "ids": {
+    "openalex": "https://openalex.org/W7204886337",
+    "doi": "https://doi.org/10.5281/zenodo.22236848"
+   },
+   "language": null,
+   "primary_location": {
+    "id": "doi:10.5281/zenodo.22236848",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.5281/zenodo.22236848",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S4306400562",
+     "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "host_organization": "https://openalex.org/I67311998",
+     "host_organization_name": "European Organization for Nuclear Research",
+     "host_organization_lineage": [
+      "https://openalex.org/I67311998"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": null,
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "article-journal"
+   },
+   "type": "article",
+   "indexed_in": [
+    "datacite"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "green",
+    "oa_url": "https://doi.org/10.5281/zenodo.22236848",
+    "any_repository_has_fulltext": true
+   },
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5148888333",
+      "display_name": "Christopher D. Pang",
+      "orcid": null
+     },
+     "institutions": [],
+     "countries": [],
+     "is_corresponding": true,
+     "raw_author_name": "Pang, Christopher D.",
+     "raw_affiliation_strings": [],
+     "raw_orcid": null,
+     "affiliations": []
+    }
+   ],
+   "institutions": [],
+   "countries_distinct_count": 0,
+   "institutions_distinct_count": 0,
+   "corresponding_author_ids": [
+    "https://openalex.org/A5148888333"
+   ],
+   "corresponding_institution_ids": [],
+   "apc_list": null,
+   "apc_paid": null,
+   "fwci": 3.7779,
+   "has_fulltext": false,
+   "cited_by_count": 2,
+   "citation_normalized_percentile": {
+    "value": 0.94255606,
+    "is_in_top_1_percent": false,
+    "is_in_top_10_percent": true
+   },
+   "cited_by_percentile_year": {
+    "min": 96,
+    "max": 98
+   },
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T11887",
+    "display_name": "Quasicrystal Structures and Properties",
+    "score": 0.5006999969482422,
+    "subfield": {
+     "id": "https://openalex.org/subfields/2505",
+     "display_name": "Materials Chemistry"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/25",
+     "display_name": "Materials Science"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/3",
+     "display_name": "Physical Sciences"
+    }
+   },
+   "topics": [
+    {
+     "id": "https://openalex.org/T11887",
+     "display_name": "Quasicrystal Structures and Properties",
+     "score": 0.5006999969482422,
+     "subfield": {
+      "id": "https://openalex.org/subfields/2505",
+      "display_name": "Materials Chemistry"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/25",
+      "display_name": "Materials Science"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    },
+    {
+     "id": "https://openalex.org/T12516",
+     "display_name": "Advanced Mathematical Theories and Applications",
+     "score": 0.07360000163316727,
+     "subfield": {
+      "id": "https://openalex.org/subfields/3109",
+      "display_name": "Statistical and Nonlinear Physics"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/31",
+      "display_name": "Physics and Astronomy"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    },
+    {
+     "id": "https://openalex.org/T13297",
+     "display_name": "History and advancements in chemistry",
+     "score": 0.0364999994635582,
+     "subfield": {
+      "id": "https://openalex.org/subfields/1606",
+      "display_name": "Physical and Theoretical Chemistry"
+     },
+     "field": {
+      "id": "https://openalex.org/fields/16",
+      "display_name": "Chemistry"
+     },
+     "domain": {
+      "id": "https://openalex.org/domains/3",
+      "display_name": "Physical Sciences"
+     }
+    }
+   ],
+   "keywords": [
+    {
+     "id": "https://openalex.org/keywords/lattice",
+     "display_name": "Lattice (music)",
+     "score": 0.45210000872612
+    },
+    {
+     "id": "https://openalex.org/keywords/lens",
+     "display_name": "Lens (geology)",
+     "score": 0.45159998536109924
+    },
+    {
+     "id": "https://openalex.org/keywords/vertex",
+     "display_name": "Vertex (graph theory)",
+     "score": 0.43959999084472656
+    },
+    {
+     "id": "https://openalex.org/keywords/rectangle",
+     "display_name": "Rectangle",
+     "score": 0.42809998989105225
+    },
+    {
+     "id": "https://openalex.org/keywords/laplace-operator",
+     "display_name": "Laplace operator",
+     "score": 0.40860000252723694
+    },
+    {
+     "id": "https://openalex.org/keywords/invariant",
+     "display_name": "Invariant (physics)",
+     "score": 0.385699987411499
+    },
+    {
+     "id": "https://openalex.org/keywords/achromatic-lens",
+     "display_name": "Achromatic lens",
+     "score": 0.3483000099658966
+    },
+    {
+     "id": "https://openalex.org/keywords/line-segment",
+     "display_name": "Line segment",
+     "score": 0.3467000126838684
+    },
+    {
+     "id": "https://openalex.org/keywords/eulers-formula",
+     "display_name": "Euler's formula",
+     "score": 0.3450999855995178
+    }
+   ],
+   "concepts": [
+    {
+     "id": "https://openalex.org/C33923547",
+     "wikidata": "https://www.wikidata.org/wiki/Q395",
+     "display_name": "Mathematics",
+     "level": 0,
+     "score": 0.659500002861023
+    },
+    {
+     "id": "https://openalex.org/C2781204021",
+     "wikidata": "https://www.wikidata.org/wiki/Q6497091",
+     "display_name": "Lattice (music)",
+     "level": 2,
+     "score": 0.45210000872612
+    },
+    {
+     "id": "https://openalex.org/C15336307",
+     "wikidata": "https://www.wikidata.org/wiki/Q1766051",
+     "display_name": "Lens (geology)",
+     "level": 2,
+     "score": 0.45159998536109924
+    },
+    {
+     "id": "https://openalex.org/C114614502",
+     "wikidata": "https://www.wikidata.org/wiki/Q76592",
+     "display_name": "Combinatorics",
+     "level": 1,
+     "score": 0.44110000133514404
+    },
+    {
+     "id": "https://openalex.org/C80899671",
+     "wikidata": "https://www.wikidata.org/wiki/Q1304193",
+     "display_name": "Vertex (graph theory)",
+     "level": 3,
+     "score": 0.43959999084472656
+    },
+    {
+     "id": "https://openalex.org/C2781302577",
+     "wikidata": "https://www.wikidata.org/wiki/Q209",
+     "display_name": "Rectangle",
+     "level": 2,
+     "score": 0.42809998989105225
+    },
+    {
+     "id": "https://openalex.org/C165700671",
+     "wikidata": "https://www.wikidata.org/wiki/Q203484",
+     "display_name": "Laplace operator",
+     "level": 2,
+     "score": 0.40860000252723694
+    },
+    {
+     "id": "https://openalex.org/C2524010",
+     "wikidata": "https://www.wikidata.org/wiki/Q8087",
+     "display_name": "Geometry",
+     "level": 1,
+     "score": 0.38839998841285706
+    },
+    {
+     "id": "https://openalex.org/C190470478",
+     "wikidata": "https://www.wikidata.org/wiki/Q2370229",
+     "display_name": "Invariant (physics)",
+     "level": 2,
+     "score": 0.385699987411499
+    },
+    {
+     "id": "https://openalex.org/C121535716",
+     "wikidata": "https://www.wikidata.org/wiki/Q340600",
+     "display_name": "Achromatic lens",
+     "level": 2,
+     "score": 0.3483000099658966
+    },
+    {
+     "id": "https://openalex.org/C182124507",
+     "wikidata": "https://www.wikidata.org/wiki/Q166154",
+     "display_name": "Line segment",
+     "level": 2,
+     "score": 0.3467000126838684
+    },
+    {
+     "id": "https://openalex.org/C62884695",
+     "wikidata": "https://www.wikidata.org/wiki/Q184871",
+     "display_name": "Euler's formula",
+     "level": 2,
+     "score": 0.3450999855995178
+    },
+    {
+     "id": "https://openalex.org/C132525143",
+     "wikidata": "https://www.wikidata.org/wiki/Q141488",
+     "display_name": "Graph",
+     "level": 2,
+     "score": 0.3418000042438507
+    },
+    {
+     "id": "https://openalex.org/C57493831",
+     "wikidata": "https://www.wikidata.org/wiki/Q3134666",
+     "display_name": "Projection (relational algebra)",
+     "level": 2,
+     "score": 0.3393999934196472
+    },
+    {
+     "id": "https://openalex.org/C120665830",
+     "wikidata": "https://www.wikidata.org/wiki/Q14620",
+     "display_name": "Optics",
+     "level": 1,
+     "score": 0.33559998869895935
+    },
+    {
+     "id": "https://openalex.org/C62354387",
+     "wikidata": "https://www.wikidata.org/wiki/Q875399",
+     "display_name": "Boundary (topology)",
+     "level": 2,
+     "score": 0.3174000084400177
+    },
+    {
+     "id": "https://openalex.org/C134306372",
+     "wikidata": "https://www.wikidata.org/wiki/Q7754",
+     "display_name": "Mathematical analysis",
+     "level": 1,
+     "score": 0.28600001335144043
+    },
+    {
+     "id": "https://openalex.org/C2834757",
+     "wikidata": "https://www.wikidata.org/wiki/Q4925424",
+     "display_name": "Monotone polygon",
+     "level": 2,
+     "score": 0.2822999954223633
+    },
+    {
+     "id": "https://openalex.org/C138187205",
+     "wikidata": "https://www.wikidata.org/wiki/Q131251",
+     "display_name": "Tangent",
+     "level": 2,
+     "score": 0.2727000117301941
+    },
+    {
+     "id": "https://openalex.org/C173734053",
+     "wikidata": "https://www.wikidata.org/wiki/Q47577",
+     "display_name": "Fibonacci number",
+     "level": 2,
+     "score": 0.27000001072883606
+    },
+    {
+     "id": "https://openalex.org/C28719098",
+     "wikidata": "https://www.wikidata.org/wiki/Q44946",
+     "display_name": "Point (geometry)",
+     "level": 2,
+     "score": 0.2678000032901764
+    },
+    {
+     "id": "https://openalex.org/C45340560",
+     "wikidata": "https://www.wikidata.org/wiki/Q215382",
+     "display_name": "Disjoint sets",
+     "level": 2,
+     "score": 0.2605000138282776
+    },
+    {
+     "id": "https://openalex.org/C128107574",
+     "wikidata": "https://www.wikidata.org/wiki/Q182003",
+     "display_name": "Injective function",
+     "level": 2,
+     "score": 0.26010000705718994
+    },
+    {
+     "id": "https://openalex.org/C81081738",
+     "wikidata": "https://www.wikidata.org/wiki/Q55542",
+     "display_name": "Lossless compression",
+     "level": 3,
+     "score": 0.25949999690055847
+    },
+    {
+     "id": "https://openalex.org/C43711488",
+     "wikidata": "https://www.wikidata.org/wiki/Q7534783",
+     "display_name": "Skew",
+     "level": 2,
+     "score": 0.2581000030040741
+    },
+    {
+     "id": "https://openalex.org/C2778355321",
+     "wikidata": "https://www.wikidata.org/wiki/Q17079427",
+     "display_name": "Identity (music)",
+     "level": 2,
+     "score": 0.2531000077724457
+    }
+   ],
+   "mesh": [],
+   "locations_count": 1,
+   "locations": [
+    {
+     "id": "doi:10.5281/zenodo.22236848",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.5281/zenodo.22236848",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4306400562",
+      "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+      "issn_l": null,
+      "issn": null,
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "host_organization": "https://openalex.org/I67311998",
+      "host_organization_name": "European Organization for Nuclear Research",
+      "host_organization_lineage": [
+       "https://openalex.org/I67311998"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "article-journal"
+    }
+   ],
+   "best_oa_location": {
+    "id": "doi:10.5281/zenodo.22236848",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.5281/zenodo.22236848",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S4306400562",
+     "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "host_organization": "https://openalex.org/I67311998",
+     "host_organization_name": "European Organization for Nuclear Research",
+     "host_organization_lineage": [
+      "https://openalex.org/I67311998"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": null,
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "article-journal"
+   },
+   "sustainable_development_goals": [],
+   "awards": [],
+   "funders": [],
+   "has_content": {
+    "grobid_xml": false,
+    "pdf": false
+   },
+   "content_urls": null,
+   "referenced_works_count": 0,
+   "referenced_works": [],
+   "related_works": [],
+   "abstract_inverted_index": {
+    "Flower": [
+     0,
+     339
+    ],
+    "of": [
+     1,
+     45,
+     119,
+     190,
+     220,
+     296,
+     340,
+     349,
+     372
+    ],
+    "Life,": [
+     2
+    ],
+    "Golden-Laced": [
+     3
+    ],
+    "Trace": [
+     4
+    ],
+    "Ribbons,": [
+     5
+    ],
+    "and": [
+     6,
+     30,
+     54,
+     76,
+     97,
+     124,
+     132,
+     166,
+     172,
+     199,
+     216,
+     286,
+     298,
+     307,
+     324,
+     381
+    ],
+    "other": [
+     7,
+     63
+    ],
+    "formalized": [
+     8
+    ],
+    "intuitions.": [
+     9
+    ],
+    "GOLD—the": [
+     10
+    ],
+    "Golden-Oriented": [
+     11
+    ],
+    "Lens": [
+     12
+    ],
+    "Diagram—is": [
+     13
+    ],
+    "a": [
+     14,
+     42,
+     68,
+     98,
+     120,
+     127,
+     153,
+     159,
+     221,
+     226,
+     231,
+     346,
+     369
+    ],
+    "static": [
+     15
+    ],
+    "mathematical": [
+     16,
+     305
+    ],
+    "construction": [
+     17
+    ],
+    "connecting": [
+     18
+    ],
+    "sixfold": [
+     19,
+     155,
+     185
+    ],
+    "circle-lattice": [
+     20
+    ],
+    "geometry,": [
+     21,
+     283
+    ],
+    "five-dimensional": [
+     22,
+     99
+    ],
+    "comparison,": [
+     23
+    ],
+    "trace-bearing": [
+     24,
+     128
+    ],
+    "paths,": [
+     25,
+     285
+    ],
+    "golden": [
+     26,
+     180
+    ],
+    "orientation,": [
+     27
+    ],
+    "projection": [
+     28,
+     189,
+     320
+    ],
+    "fibers,": [
+     29
+    ],
+    "global": [
+     31,
+     247
+    ],
+    "defect": [
+     32,
+     248
+    ],
+    "accounting.": [
+     33
+    ],
+    "On": [
+     34
+    ],
+    "the": [
+     35,
+     79,
+     86,
+     103,
+     115,
+     143,
+     184,
+     191,
+     195,
+     213,
+     245,
+     255,
+     294,
+     303,
+     309,
+     338,
+     373
+    ],
+    "triangular": [
+     36,
+     357
+    ],
+    "lattice,": [
+     37,
+     358
+    ],
+    "every": [
+     38
+    ],
+    "nearest-neighbor": [
+     39,
+     280
+    ],
+    "edge": [
+     40
+    ],
+    "determines": [
+     41
+    ],
+    "reciprocal": [
+     43
+    ],
+    "pair": [
+     44
+    ],
+    "circle": [
+     46
+    ],
+    "lenses": [
+     47,
+     89
+    ],
+    "with": [
+     48,
+     158,
+     183,
+     261
+    ],
+    "exact": [
+     49,
+     176,
+     356
+    ],
+    "formulas": [
+     50
+    ],
+    "for": [
+     51,
+     250,
+     258
+    ],
+    "area,": [
+     52
+    ],
+    "perimeter,": [
+     53
+    ],
+    "thickness.": [
+     55
+    ],
+    "The": [
+     56,
+     163
+    ],
+    "smaller": [
+     57
+    ],
+    "lens": [
+     58,
+     121
+    ],
+    "contains": [
+     59,
+     272
+    ],
+    "no": [
+     60,
+     335
+    ],
+    "lattice": [
+     61,
+     81
+    ],
+    "vertices": [
+     62,
+     197
+    ],
+    "than": [
+     64
+    ],
+    "its": [
+     65,
+     137,
+     315,
+     361
+    ],
+    "endpoints,": [
+     66
+    ],
+    "giving": [
+     67
+    ],
+    "precise": [
+     69
+    ],
+    "discrete": [
+     70
+    ],
+    "meaning": [
+     71
+    ],
+    "to": [
+     72,
+     201
+    ],
+    "“nothing": [
+     73
+    ],
+    "between": [
+     74
+    ],
+    "A": [
+     75,
+     187,
+     263
+    ],
+    "B”": [
+     77
+    ],
+    "at": [
+     78
+    ],
+    "declared": [
+     80
+    ],
+    "scale.": [
+     82
+    ],
+    "Scalar": [
+     83
+    ],
+    "data": [
+     84
+    ],
+    "on": [
+     85
+    ],
+    "six": [
+     87,
+     214,
+     217
+    ],
+    "incident": [
+     88
+    ],
+    "decomposes": [
+     90
+    ],
+    "canonically": [
+     91
+    ],
+    "into": [
+     92,
+     110
+    ],
+    "one": [
+     93,
+     202
+    ],
+    "invariant": [
+     94
+    ],
+    "common": [
+     95,
+     362
+    ],
+    "mode": [
+     96,
+     363
+    ],
+    "zero-sum": [
+     100
+    ],
+    "comparison": [
+     101
+    ],
+    "space;": [
+     102
+    ],
+    "six-cycle": [
+     104
+    ],
+    "Laplacian": [
+     105
+    ],
+    "resolves": [
+     106
+    ],
+    "those": [
+     107
+    ],
+    "comparisons": [
+     108
+    ],
+    "further": [
+     109
+    ],
+    "2+2+1": [
+     111
+    ],
+    "real": [
+     112
+    ],
+    "modes.": [
+     113
+    ],
+    "Labeling": [
+     114
+    ],
+    "two": [
+     116
+    ],
+    "boundary": [
+     117
+    ],
+    "arcs": [
+     118
+    ],
+    "as": [
+     122,
+     328
+    ],
+    "occurrence": [
+     123
+    ],
+    "receipt": [
+     125
+    ],
+    "produces": [
+     126
+    ],
+    "bigon.": [
+     129
+    ],
+    "Its": [
+     130
+    ],
+    "endpoints": [
+     131
+    ],
+    "first-order": [
+     133
+    ],
+    "displacement": [
+     134
+    ],
+    "agree,": [
+     135
+    ],
+    "while": [
+     136,
+     205,
+     236
+    ],
+    "signed": [
+     138
+    ],
+    "second-level": [
+     139
+    ],
+    "path": [
+     140
+    ],
+    "signature": [
+     141
+    ],
+    "retains": [
+     142
+    ],
+    "enclosed": [
+     144
+    ],
+    "residual": [
+     145
+    ],
+    "area.": [
+     146
+    ],
+    "Golden": [
+     147
+    ],
+    "phase": [
+     148
+    ],
+    "is": [
+     149,
+     170,
+     302,
+     325,
+     345,
+     377
+    ],
+    "represented": [
+     150
+    ],
+    "losslessly": [
+     151
+    ],
+    "by": [
+     152,
+     268
+    ],
+    "nearest": [
+     154
+    ],
+    "sector": [
+     156
+    ],
+    "together": [
+     157
+    ],
+    "retained": [
+     160
+    ],
+    "angular": [
+     161
+    ],
+    "residual.": [
+     162
+    ],
+    "associated": [
+     164
+    ],
+    "two-": [
+     165
+    ],
+    "three-sector": [
+     167
+    ],
+    "step": [
+     168
+    ],
+    "sequence": [
+     169
+    ],
+    "Sturmian,": [
+     171
+    ],
+    "Fibonacci": [
+     173
+    ],
+    "indices": [
+     174
+    ],
+    "produce": [
+     175
+    ],
+    "near-returns": [
+     177
+    ],
+    "without": [
+     178
+    ],
+    "making": [
+     179
+    ],
+    "rotation": [
+     181
+    ],
+    "commensurate": [
+     182
+    ],
+    "lattice.": [
+     186
+    ],
+    "body-diagonal": [
+     188
+    ],
+    "cube": [
+     192
+    ],
+    "graph": [
+     193
+    ],
+    "maps": [
+     194
+    ],
+    "opposite": [
+     196
+    ],
+    "000": [
+     198
+    ],
+    "111": [
+     200
+    ],
+    "central": [
+     203
+    ],
+    "image": [
+     204
+    ],
+    "mapping": [
+     206
+    ],
+    "all": [
+     207
+    ],
+    "twelve": [
+     208
+    ],
+    "source": [
+     209
+    ],
+    "edges": [
+     210,
+     219
+    ],
+    "bijectively": [
+     211
+    ],
+    "onto": [
+     212
+    ],
+    "spokes": [
+     215
+    ],
+    "rim": [
+     218
+    ],
+    "seven-vertex": [
+     222
+    ],
+    "wheel.": [
+     223
+    ],
+    "This": [
+     224
+    ],
+    "provides": [
+     225
+    ],
+    "concrete": [
+     227
+    ],
+    "example": [
+     228
+    ],
+    "in": [
+     229,
+     293
+    ],
+    "which": [
+     230
+    ],
+    "complete": [
+     232
+    ],
+    "source-edge": [
+     233
+    ],
+    "ledger": [
+     234,
+     249
+    ],
+    "survives": [
+     235
+    ],
+    "source-vertex": [
+     237
+    ],
+    "identity": [
+     238
+    ],
+    "does": [
+     239,
+     312
+    ],
+    "not.": [
+     240
+    ],
+    "Euler": [
+     241
+    ],
+    "characteristic": [
+     242
+    ],
+    "then": [
+     243
+    ],
+    "supplies": [
+     244
+    ],
+    "corresponding": [
+     246
+    ],
+    "closed": [
+     251
+    ],
+    "triangulated": [
+     252
+    ],
+    "surfaces,": [
+     253
+    ],
+    "including": [
+     254
+    ],
+    "required": [
+     256
+    ],
+    "correction": [
+     257
+    ],
+    "finite": [
+     259
+    ],
+    "surfaces": [
+     260
+    ],
+    "boundary.": [
+     262
+    ],
+    "private": [
+     264
+    ],
+    "digital": [
+     265
+    ],
+    "journal": [
+     266
+    ],
+    "kept": [
+     267
+    ],
+    "Christopher": [
+     269
+    ],
+    "D.": [
+     270
+    ],
+    "Pang": [
+     271
+    ],
+    "author-dated": [
+     273
+    ],
+    "2012–2013": [
+     274
+    ],
+    "antecedents": [
+     275
+    ],
+    "involving": [
+     276
+    ],
+    "Flower-of-Life": [
+     277
+    ],
+    "patterns,": [
+     278
+    ],
+    "paired": [
+     279
+    ],
+    "lines,": [
+     281
+    ],
+    "six-around-one": [
+     282
+    ],
+    "temporal": [
+     284
+    ],
+    "golden-ratio": [
+     287
+    ],
+    "spirals.": [
+     288
+    ],
+    "These": [
+     289
+    ],
+    "entries": [
+     290
+    ],
+    "document": [
+     291
+    ],
+    "continuity": [
+     292
+    ],
+    "selection": [
+     295
+    ],
+    "questions": [
+     297
+    ],
+    "images.": [
+     299
+    ],
+    "GOLD": [
+     300,
+     333
+    ],
+    "v0.1": [
+     301
+    ],
+    "2026": [
+     304
+    ],
+    "formalization": [
+     306
+    ],
+    "synthesis;": [
+     308
+    ],
+    "historical": [
+     310
+    ],
+    "record": [
+     311
+    ],
+    "not": [
+     313,
+     326,
+     383
+    ],
+    "contain": [
+     314
+    ],
+    "definitions,": [
+     316
+    ],
+    "proofs,": [
+     317
+    ],
+    "coding": [
+     318
+    ],
+    "theorem,": [
+     319,
+     321
+    ],
+    "or": [
+     322,
+     342,
+     359,
+     368
+    ],
+    "name": [
+     323
+    ],
+    "presented": [
+     327
+    ],
+    "independently": [
+     329
+    ],
+    "authenticated": [
+     330
+    ],
+    "publication": [
+     331
+    ],
+    "priority.": [
+     332
+    ],
+    "makes": [
+     334
+    ],
+    "claim": [
+     336
+    ],
+    "that": [
+     337,
+     351,
+     360
+    ],
+    "Life": [
+     341
+    ],
+    "Metatron’s": [
+     343
+    ],
+    "Cube": [
+     344
+    ],
+    "physical": [
+     347,
+     370
+    ],
+    "blueprint": [
+     348
+    ],
+    "matter,": [
+     350
+    ],
+    "golden-angle": [
+     352
+    ],
+    "phyllotaxis": [
+     353
+    ],
+    "forms": [
+     354
+    ],
+    "an": [
+     355,
+     378
+    ],
+    "proves": [
+     364
+    ],
+    "continuous": [
+     365
+    ],
+    "existence,": [
+     366
+    ],
+    "consciousness,": [
+     367
+    ],
+    "theory": [
+     371
+    ],
+    "universe.": [
+     374
+    ],
+    "Version": [
+     375
+    ],
+    "0.1": [
+     376
+    ],
+    "author": [
+     379
+    ],
+    "manuscript": [
+     380
+    ],
+    "has": [
+     382
+    ],
+    "undergone": [
+     384
+    ],
+    "peer": [
+     385
+    ],
+    "review.": [
+     386
+    ]
+   },
+   "counts_by_year": [
+    {
+     "year": 2026,
+     "cited_by_count": 2
+    }
+   ],
+   "updated_date": "2026-09-06T09:10:53.072986",
+   "created_date": "2026-09-02T00:00:00"
+  }
+ ],
+ "group_by": []
+}

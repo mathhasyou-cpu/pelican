@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/dBT/2hx0llLcx2L8ryTr0wQW6vU</id>
+  <title>arXiv Query: search_query=(cat:cs.LG OR cat:cond-mat.mtrl-sci) AND submittedDate:"202609060000 TO 202609070000"&amp;id_list=&amp;start=0&amp;max_results=3</title>
+  <updated>2026-09-09T17:18:20Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=(cat:cs.LG+OR+cat:cond-mat.mtrl-sci)+AND+submittedDate:%22202609060000+TO+202609070000%22&amp;start=0&amp;max_results=3&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>3</opensearch:itemsPerPage>
+  <opensearch:totalResults>84</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.06873v1</id>
+    <title>Large Classification-Risk-Optional Label Acquisition</title>
+    <updated>2026-09-06T23:31:55Z</updated>
+    <link href="https://arxiv.org/abs/2609.06873v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.06873v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study how a limited labeling budget should be allocated to minimize multiclass zero-one classification risk. We consider parametric classification problems in which features are observed for all sampling units while class labels can be acquired selectively. By combining the Fisher information supplied by an acquired label with the local geometry of multiclass excess risk, we derive an acquisition criterion that minimizes the leading asymptotic coefficient of expected multiclass excess risk. The resulting rule values a label according to how strongly its information is aligned with parameter directions that perturb the active Bayes decision boundary, rather than according to posterior uncertainty or global parameter information alone. We characterize the oracle acquisition design, establish its threshold structure, and derive face-specific and cost-sensitive extensions. An analytic example shows that posterior uncertainty and classification value can produce different, and even reversed, acquisition rankings. We further develop a two-stage adaptive procedure that attains the oracle leading-risk criterion under regularity conditions and provide explicit results for Gaussian discriminant analysis. Three-class QDA experiments illustrate the resulting acquisition geometry, while an application to the six-class Statlog Landsat Satellite data shows that classification-risk acquisition can differ materially from both uncertainty-based acquisition and the complete-classification-information comparator. The adaptive classification-risk design attains lower mean error than this Fisher comparator across the labeling budgets considered, although it does not uniformly outperform entropy or margin sampling and differences among the targeted strategies become small as the labeling budget increases.</summary>
+    <category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-06T23:31:55Z</published>
+    <arxiv:primary_category term="stat.ML"/>
+    <author>
+      <name>F. Setoudehtanzangi</name>
+    </author>
+    <author>
+      <name>Geoffrey J. McLachlan</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.06872v1</id>
+    <title>Exact Record Omission in Delta Attention: A Transport Criterion, Its Cost, and a Replay Certificate</title>
+    <updated>2026-09-06T23:25:58Z</updated>
+    <link href="https://arxiv.org/abs/2609.06872v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.06872v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>When a user asks an assistant to forget a record, the test is whether the memory now matches the state it would hold if the record had never been stored. Independently encoded rows can be removed directly; a recurrent memory folds records into an evolving state. One hope is a receipt: save the difference the record made when it arrived, carry it forward through later updates, and subtract it, so that deletion costs one fixed-size edit no matter how long the conversation runs. We show that a transported receipt reaches exact omission if and only if the changes the record induces in later updates cancel out on net, and we measure whether they do on the released 48B Kimi Linear hybrid. They do not: after 4,096 further tokens the record still leaves an imprint of about 4.5% of the state norm that none of the tested receipt classes removes, recomputing half the suffix closes less than half the gap, and the per-token log a receipt needs costs more than a full checkpoint after 88 tokens. The same write-rule classification held on Mamba-2, Falcon-H1, and RWKV-7 with predictions recorded before the runs. Restoring a checkpoint from before the record and replaying the surviving suffix matches the never-stored state exactly on every array we check. In the hybrid suffix sweep, masking the record's attention rows brings sampled recovery close to the never-stored floor even though the recurrent imprint remains, and an auditor who rebuilds the reference can still detect it. Among the evaluated methods, checkpoint replay achieves exact omission, with work proportional to the replayed suffix.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-06T23:25:58Z</published>
+    <arxiv:comment>22 pages, 8 figures, 9 tables. Source-free evidence for every quantitative claim is packaged with the source</arxiv:comment>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Vishwajith Ramesh</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.06869v1</id>
+    <title>PPIM: Pennes Physics-Informed Mamba for Heat-Source-Conditioned 3D Bioheat Simulation</title>
+    <updated>2026-09-06T22:56:34Z</updated>
+    <link href="https://arxiv.org/abs/2609.06869v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.06869v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Three-dimensional bioheat simulation aims to predict transient temperature distributions in biological tissue and is commonly modeled using the Pennes bioheat equation, which combines thermal diffusion, perfusion-mediated heat loss, and external heat generation. In this study, we consider a controlled 3D Pennes bioheat simulation under a localized heat-source condition inspired by microwave ablation (MWA). To evaluate neural approximation performance, we compare three neural partial differential equation (PDE) solvers under the same controlled simulation: a spatial Fourier-feature physics-informed neural network (PINN), a generic PINNMamba temporal subsequence model, and Pennes Physics-Informed Mamba (PPIM). PPIM builds on the temporal subsequence model by incorporating conditioned heat-source input and Pennes-aware state-space model (SSM) decay initialization. All three neural models are trained under the same conditions with the same Pennes residual, and an explicit finite-difference method (FDM) solution is used only as the numerical reference. In a representative 600~s run, PPIM achieved the lowest MAE, relative $L_1$ error, and relative $L_2$ error among the evaluated neural solvers. Error maps further showed that the remaining PPIM errors were more concentrated near the heat-source region than across the rest of the domain. These results indicate that PPIM is effective for approximating the FDM reference final temperature field in this controlled simulation. The source code is available at https://github.com/muvYun/PPIM.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="math-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-06T22:56:34Z</published>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Dongyun Lee</name>
+    </author>
+    <author>
+      <name>Kyungho Yoon</name>
+    </author>
+    <author>
+      <name>Minwoo Shin</name>
+    </author>
+  </entry>
+</feed>

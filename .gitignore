@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+logs/
+.pytest_cache/
+.ruff_cache/
+# Корневой .gitignore прячет любой reports/; у сдачи отчёт метрик — артефакт.
+!reports/
+reports/*
+!reports/weak-eval.md
+# Отчёты, на которые ссылаются techdoc и weak-eval: модель этапа 1 с важностью признаков,
+# зоопарк моделей, временной holdout модели роста.
+!reports/weak-model.md
+!reports/weak-model-zoo.md
+!reports/weak-growth-holdout.md
+!reports/weak-growth-holdout.in-query.money-pool-to-*.md
+bash.exe.stackdump

@@ -1,0 +1,119 @@
+# Радар слабых сигналов: интерфейс (ui) → API с очередью (api) → Postgres.
+# Локальная модель (LM Studio или любой OpenAI-совместимый сервер) работает вне
+# контейнеров, на хосте: ей нужна GPU. Шарды векторов корпуса монтируются с хоста только
+# на чтение. Сайдкар tailscale поднимается профилем `stand` и публикует интерфейс наружу.
+#
+#   docker compose up -d                      # ui на http://127.0.0.1:8501
+#   docker compose --profile stand up -d      # + публичный адрес через Tailscale Funnel
+
+x-app: &app
+  build: .
+  image: pelican:latest
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pelican
+      POSTGRES_USER: pelican
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pelican}
+    # Корпус — 15 млн работ с полнотекстовым индексом: умолчания Postgres (128 МБ буферов,
+    # 64 МБ на обслуживание) строили бы GIN часами. Числа — под VM Docker в 8 ГБ, из
+    # которых часть занята LM Studio на той же машине.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=2GB
+      - -c
+      - effective_cache_size=6GB
+      - -c
+      - maintenance_work_mem=2GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - max_parallel_workers_per_gather=4
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - max_wal_size=8GB
+    shm_size: 2gb
+    # ⚠️ Образ 18 держит данные в /var/lib/postgresql/18/docker, поэтому том монтируется
+    # на уровень выше. Смонтированный в старый …/data, он остался бы пустым, а база жила бы
+    # в слое контейнера и пропала при его пересоздании.
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5436}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pelican -d pelican"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    <<: *app
+    command: ["uvicorn", "pelican.api:app", "--host", "0.0.0.0", "--port", "8010"]
+    environment:
+      DATABASE_URL: postgresql://pelican:${POSTGRES_PASSWORD:-pelican}@postgres:5432/pelican
+      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://host.docker.internal:1234/v1}
+      DATA_DIR: /data
+      EMB_DIR: /shards
+      # Нативный поиск по шардам на хосте (`python -m pelican.shard_server`): через bind
+      # mount проход втрое медленнее. Не запущен — `api` проходит шарды сам.
+      SHARDS_URL: ${SHARDS_URL_DOCKER:-http://host.docker.internal:8020}
+    volumes:
+      - appdata:/data
+      - ${EMB_HOST_DIR:-./data/emb-science}:/shards:ro
+    ports:
+      - "127.0.0.1:${API_PORT:-8010}:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ui:
+    <<: *app
+    command:
+      - streamlit
+      - run
+      - ui/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    environment:
+      API_URL: http://api:8010
+    ports:
+      - "127.0.0.1:${UI_PORT:-8501}:8501"
+    depends_on:
+      - api
+
+  # Публичный адрес стенда: отдельный узел tailnet с именем `pelican`, Funnel на 443 → ui.
+  # Нужны TS_AUTHKEY (админка Tailscale → Keys) и атрибут `funnel` в политике tailnet.
+  tailscale:
+    image: tailscale/tailscale:latest
+    profiles: ["stand"]
+    hostname: pelican
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      # Userspace-сеть: без /dev/net/tun и NET_ADMIN, что проще на Docker Desktop.
+      TS_USERSPACE: "true"
+    volumes:
+      - tsstate:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    depends_on:
+      - ui
+
+volumes:
+  pgdata:
+  appdata:
+  tsstate:

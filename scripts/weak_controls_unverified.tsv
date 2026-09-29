@@ -1,0 +1,17 @@
+n	tech	domain	expected
+u1	Автоматизированное управление конфиденциальностью и комплаенсом данных	Защита ИИ	too_broad
+u2	Edge AI Sensing and Deployment	Edge	mature
+u3	On-edge computer vision и Physical AI	Edge	mature
+u4	AI-powered threat detection and defense	Защита ИИ	mature
+u5	Обнаружение веб-шеллов с помощью Deep Learning	Защита ИИ	mature
+u6	AI Digital Twins для симуляции персонала и промышленности	Индустриальный ИИ	mature
+u7	Domain-trained AI для промышленной автоматизации	Индустриальный ИИ	mature
+u8	Архитектуры графов знаний для генеративного ИИ (Knowledge Graph Architectures for Generative AI)	Индустриальный ИИ	mature
+u9	Мультиагентные системы для специализированных исследований и рабочих процессов	Индустриальный ИИ	mature
+u10	Долгосрочная память и контекстные графы для AI-агентов	Инфраструктура ИИ	mature
+u11	Мультиагентные системы для автономных рабочих процессов (Multi-agent systems for autonomous workflows)	Инфраструктура ИИ	mature
+u12	Federated Learning для Edge Computing	Инфраструктура ИИ	mature
+u13	Системы морской автономности (Maritime Autonomy Systems)	Роботы	mature
+u14	Multi-agent architectures для финансовых услуг	Финтех	mature
+u15	Onchain финансовая инфраструктура и расчеты (Onchain financial infrastructure and settlement)	Финтех	mature
+u16	Автономные AI агенты для финансовых услуг	Финтех	mature

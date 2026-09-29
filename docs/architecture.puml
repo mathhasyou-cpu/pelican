@@ -1,0 +1,67 @@
+@startuml architecture
+title Радар слабых сигналов — архитектура и поток данных
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam componentStyle rectangle
+left to right direction
+
+actor "Эксперт" as user
+
+cloud "Открытые источники" {
+  [arXiv API] as arxiv
+  [OpenAlex API] as openalex
+  [Google News RSS\n(en, ru)] as gnews
+  [КиберЛенинка] as cyber
+  [Хабр] as habr
+  [GitHub Search] as github
+  [EPO OPS\n(патенты)] as epo
+}
+
+node "Хост (GPU)" {
+  [LM Studio\ngemma-4-12b-qat\nembedding-gemma-300m] as llm
+  folder "emb-science/\nшарды векторов\n(14 млн × 768, fp16)" as shards
+}
+
+package "docker compose" {
+  [ui\nStreamlit] as ui
+  component "api\nFastAPI" as api {
+    [очередь FIFO\n+ исполнитель] as worker
+    [weak.ask\nконвейер запроса] as ask
+  }
+  database "postgres:18" as pg {
+    [works\n15.2 млн работ\n+ GIN(tsvector)] as works
+    [tech_mentions\ntech_groups] as tech
+    [jobs\nочередь] as jobs
+    [reports\nJSON + HTML] as reports
+  }
+  [tailscale\n(профиль stand)\nFunnel :443] as ts
+}
+
+package "ETL (по расписанию, вне запроса)" {
+  [pelican.collect\nсуточное окно / история] as collect
+  [scripts/embed_science.py\nдокачка векторов] as embedsci
+}
+
+user --> ts : HTTPS
+ts --> ui
+ui --> api : REST /api/*
+api --> jobs
+worker --> ask
+ask --> works : след корпуса\n(полнотекст)
+ask --> tech : приём в работах
+ask --> shards : поиск ближайших\nработ (косинус)
+ask --> llm : генерация,\nэмбеддинги
+ask --> gnews
+ask --> cyber
+ask --> habr
+ask --> github
+ask --> epo : финалистам ТОП
+worker --> reports
+
+arxiv --> collect
+openalex --> collect
+collect --> works : COPY,\nid из ключа
+works --> embedsci
+embedsci --> llm
+embedsci --> shards
+@enduml

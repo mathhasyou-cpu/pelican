@@ -1,0 +1,15 @@
+label	row	same
+neuromorphic processors for edge ai	Нейроморфные edge-процессоры, встраиваемые в стандартные EDA-потоки	1
+mechanistic interpretability and auditing for llms	Интерпретируемость как операционный защитный контроль (interpretability-based safeguards)	1
+tokenization of real-world assets and funds	Токенизированные паи денежных фондов (MMF) как мобильное обеспечение	1
+privacy-preserving data sharing for fraud prevention	Федеративное обучение для межбанковского AML/антифрода (без обмена сырыми данными)	1
+photonic and analog ai accelerators	Аналоговые вычисления в памяти (analog in-memory computing)	1
+privacy-preserving federated learning frameworks	Федеративное обучение между площадками/предприятиями	1
+adversarial defense and security for large language models	Сканеры безопасности MCP-серверов и защита от tool poisoning	0
+graph neural networks for fraud and anomaly detection	Федеративное обучение для межбанковского AML/антифрода (без обмена сырыми данными)	0
+enterprise ai production deployment platforms	Малые модульные реакторы (SMR) как выделенный источник питания ЦОД	0
+ai-driven chip design and semiconductor manufacturing	LLM-генерация кода ПЛК на IEC 61131-3 Structured Text	0
+blockchain-based liquidity and treasury management	Машинные микроплатежи по HTTP 402 (оплата за API-вызов)	0
+neuro-symbolic and deep learning for enterprise systems	Токенизированные паи денежных фондов (MMF) как мобильное обеспечение	0
+ai security and threat protection	Автоматизированный red-teaming ИИ-моделей как услуга	0
+enterprise ai agent orchestration	Протоколы авторизации платежей ИИ-агентов (x402 / AP2 / ACP)	0

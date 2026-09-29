@@ -1,0 +1,42 @@
+[project]
+name = "pelican"
+version = "0.1.0"
+description = "Радар слабых сигналов: открытый запрос → ТОП-15 зарождающихся технологий"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "streamlit>=1.40",
+    "psycopg[binary]>=3.2",
+    "duckdb>=1.1",          # только перелив корпуса через Quack (pelican.load_corpus)
+    "httpx>=0.27",
+    "tenacity>=9.0",
+    "numpy>=2.0",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.8"]
+# Обучение моделей этапа 1 и отчёт метрик (scripts/train_*.py, model_zoo.py).
+ml = ["scikit-learn>=1.5", "scipy>=1.13", "joblib>=1.4"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pelican = ["schema.sql", "weak/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src", "."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
