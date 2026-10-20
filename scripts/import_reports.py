@@ -28,7 +28,7 @@ NAME = jobs.REPORT_NAME
 
 def report_name(stem: str, started: datetime) -> str:
     """Имя файла, если оно по правилу; иначе — время старта прогона."""
-    return stem if NAME.fullmatch(stem) else f"{started:%Y%m%d-%H%M%S}"
+    return stem if NAME.fullmatch(stem) else jobs.report_stamp(started)
 
 
 def main() -> int:

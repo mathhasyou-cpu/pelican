@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pelican import jobs, locks
 from pelican.config import settings
@@ -30,7 +30,7 @@ def run_query(
     from pelican.weak import history, page
     from pelican.weak.ask import run as run_ask
 
-    started = datetime.now()
+    started = datetime.now(UTC)
     hooks = {"on_event": emit} if emit is not None else {}
     with locks.hold(MODEL_LOCK), Store(settings.database_url) as store:
         result = run_ask(store, query, on_progress=say, **hooks)
@@ -42,4 +42,4 @@ def run_query(
         query, len(result.signals), result.candidates, result.sources_processed,
         ", ".join(f"{m['role']}={m['model']}" for m in result.models) or result.model,
     )
-    return f"{started:%Y%m%d-%H%M%S}", page.to_json(result), page.render(result)
+    return jobs.report_stamp(started), page.to_json(result), page.render(result)

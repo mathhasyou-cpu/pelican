@@ -17,17 +17,19 @@ export function Go({ to, children, ...rest }) {
   return <a href={"#" + to} onClick={onClick} {...rest}>{children}</a>;
 }
 
-/* Экран, пока данные идут с сервера, и экран отказа — с понятным текстом и выходом. */
+/* Экран, пока данные идут с сервера, и экран отказа — с понятным текстом и выходом.
+   `retry` — сбой сети или сервера: сам экран не повторяет, повтор — кнопкой. */
 export function Loading({ text }) {
   return <section className="page-head"><p className="status"><span className="pulse" />{text}</p></section>;
 }
-export function Fail({ title, text }) {
+export function Fail({ title, text, retry }) {
   return (
     <section className="page-head">
       <h1 className="h1">{title}</h1>
       <p className="lead">{text}</p>
       <p className="row" style={{ marginTop: "var(--sp-6)" }}>
-        <Go to="" className="btn primary"><Icon name="plus" />Новый запрос</Go>
+        {retry && <button type="button" className="btn primary" onClick={() => location.reload()}><Icon name="arrow-right" />Повторить</button>}
+        <Go to="" className={retry ? "btn" : "btn primary"}><Icon name="plus" />Новый запрос</Go>
         <Go to="history" className="btn"><Icon name="history" />История</Go>
       </p>
     </section>

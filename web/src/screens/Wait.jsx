@@ -50,11 +50,11 @@ export default function Wait({ id }) {
     }, (err) => {
       if (!live) return;
       setError(err.status === 404 ? { title: "Такого запроса нет", text: "Ссылка устарела или набрана с ошибкой. Готовые отчёты — в истории." }
-        : { title: "Запрос не открылся", text: err.message });
+        : { title: "Запрос не открылся", text: err.message, retry: true });
     });
     return () => { live = false; };
   }, [id]);   // снимок задания — один раз на номер
-  if (error) return <Fail title={error.title} text={error.text} />;
+  if (error) return <Fail title={error.title} text={error.text} retry={error.retry} />;
   if (!snap) return <Loading text="Открываю запрос" />;
   return <Live snap={snap} />;
 }
@@ -217,7 +217,8 @@ function Live({ snap }) {
     player.on("done", (e) => {
       if (!e.replay) app.toast("Отчёт готов", "check");
       app.loadHistory().catch(() => {});
-      app.navTo("report=" + e.report, { view: "radar" });
+      // replace, не push: иначе «Назад» вернёт на ожидание, а оно снова откроет отчёт (NFR-12)
+      app.navTo("report=" + e.report, { view: "radar", replace: true });
     });
     player.on("failed", (e) => {
       running = true; paint(player.lastAt || 0); running = false;   // часы и полоса — где прогон остановился

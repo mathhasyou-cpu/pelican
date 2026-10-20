@@ -316,6 +316,19 @@ def test_history_endpoint_has_total_search_and_summary(setup, pg_url):
         assert got["typical_run_s"] == round(jobs.typical_run_s(c), 1)
 
 
+def test_input_outside_postgres_types_is_422_not_500(setup):
+    # NUL Postgres не хранит в text, число больше BIGINT psycopg шлёт numeric: оба падали 500.
+    client, _ = setup
+    huge = str(2**63)
+    assert client.get("/api/history", params={"q": "a\x00b"}).status_code == 422
+    assert client.get("/api/history", params={"offset": huge}).status_code == 422
+    assert client.get("/api/history", params={"offset": str(2**63 - 1)}).status_code == 200
+    assert client.post("/api/ask", json={"query": "кибер\x00безопасность"}).status_code == 422
+    assert client.get(f"/api/jobs/{huge}").status_code == 422
+    assert client.get("/api/jobs/1/events", params={"after": huge}).status_code == 422
+    assert client.post(f"/api/jobs/{huge}/cancel").status_code == 422
+
+
 def test_saved_report_stage_follows_ladder_in_every_list():
     # BR-15: старый отчёт хранит у исключённых ступень модели — экран показывает лестницу,
     # как и HTML (`page.from_json`); ступень без вех и свежая ступень не меняются.

@@ -61,6 +61,20 @@ EVIDENCE = 8
 EVIDENCE_CHARS = 320
 
 _REF = re.compile(r"\[(\d+)\]")
+_REF_GROUP = re.compile(r"(\s?)\[([\d,\s]+)\]")
+
+
+def keep_refs(text: str, n: int) -> str:
+    """Убрать из текста номера ссылок вне 1..n: «[3, 25]» → «[3]», «[25]» — целиком.
+
+    Текст держится на верной ссылке, а номер без источника оставался висеть в нём
+    (отчёт ссылался на [25] при 15 источниках)."""
+
+    def fix(m: re.Match[str]) -> str:
+        nums = [r for r in m.group(2).replace(" ", "").split(",") if r and 1 <= int(r) <= n]
+        return f"{m.group(1)}[{', '.join(nums)}]" if nums else ""
+
+    return _REF_GROUP.sub(fix, text)
 
 SYSTEM_PROMPT = f"""You assess one TECHNOLOGY using ONLY the EVIDENCE listed under
 it. Each item has a number, a date, a type (PAPER = research work, NEWS = industry
@@ -259,7 +273,7 @@ def parse(payload: dict[str, Any], candidate: Candidate) -> Assessment:
         # ⚠️ Вывод без единой ссылки на работу неотличим от знаний модели, а их
         # ТЗ как основание запрещает. Жанр и стадию оставляем, объяснение — нет.
         why = ""
-    return Assessment(candidate.key, kind, stage, why, cited, judgments(payload))
+    return Assessment(candidate.key, kind, stage, keep_refs(why, shown), cited, judgments(payload))
 
 
 def judgments(payload: dict[str, Any]) -> dict[str, float]:

@@ -2,11 +2,12 @@
 
     python scripts/retext.py --all                 # сухо: сколько пустых причин и латинских названий
     python scripts/retext.py --all --save          # причины + названия (модель), записать обратно
-    python scripts/retext.py --all --save --no-model   # только причины, модель не нужна
+    python scripts/retext.py --all --save --no-model   # причины и ссылки, модель не нужна
 
 Отчёт хранит тексты той версии конвейера, что его собрала. Исключённый без объяснения со
 ссылкой получает причину из своих же признаков оценки (`ask.excluded_why`, BR-03) — это
-детерминированно и модели не требует. Название без кириллицы (NFR-01) переводится тем же
+детерминированно и модели не требует. Так же без модели из текстов снимаются номера ссылок
+вне списка источников кандидата (`assess.keep_refs`). Название без кириллицы (NFR-01) переводится тем же
 `ask.russian_titles`, что и в прогоне, под замком модели. Отбор, оценка и порядок не меняются;
 имя и `started` отчёта — прежние (BR-45).
 """
@@ -29,6 +30,7 @@ from pelican.config import settings  # noqa: E402
 from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.weak import card, page  # noqa: E402
 from pelican.weak.ask import excluded_why, russian_titles  # noqa: E402
+from pelican.weak.assess import keep_refs  # noqa: E402
 
 #: Разделы отчёта с названиями кандидатов.
 SECTIONS = ("signals", "thin", "watch", "excluded")
@@ -41,6 +43,24 @@ def fill_why(result: dict) -> int:
         if not (x.get("why") or "").strip() and (why := excluded_why(x.get("kind", ""), x.get("judgments") or {})):
             x["why"] = why
             n += 1
+    return n
+
+
+#: Тексты кандидата со ссылками [n] на его `sources`.
+CITED = ("why", "description", "advantage", "case", "hypothesis")
+
+
+def fix_refs(result: dict) -> int:
+    """Номера ссылок вне списка источников кандидата (`assess.keep_refs`); сколько текстов исправлено."""
+    n = 0
+    for x in (x for key in SECTIONS for x in result.get(key) or [] if isinstance(x, dict)):
+        total = len(x.get("sources") or [])
+        texts = [(x, k) for k in CITED if isinstance(x.get(k), str)]
+        texts += [(f, "text") for f in x.get("facts") or [] if isinstance(f, dict) and isinstance(f.get("text"), str)]
+        for obj, k in texts:
+            if (fixed := keep_refs(obj[k], total)) != obj[k]:
+                obj[k] = fixed
+                n += 1
     return n
 
 
@@ -77,11 +97,12 @@ def main() -> None:
                 print(f"{name}: отчёта нет")
                 continue
             result = json.loads(json.dumps(row["result"]))
-            whys, latin = fill_why(result), latin_titles(result)
+            whys, refs, latin = fill_why(result), fix_refs(result), latin_titles(result)
             titled = retitle(latin) if args.save and latin and not args.no_model else 0
-            print(f"{name} «{row['query']}»: причин дописано {whys}; латинских названий {len(latin)}"
+            print(f"{name} «{row['query']}»: причин дописано {whys}; ссылок без источника снято "
+                  f"в {refs} текстах; латинских названий {len(latin)}"
                   + (f", переведено {titled}" if titled else ""))
-            if args.save and (whys or titled):
+            if args.save and (whys or refs or titled):
                 html = page.render(page.from_json(result))
                 jobs.save_report(conn, name, row["query"], row["started"],
                                  json.dumps(result, ensure_ascii=False), html)

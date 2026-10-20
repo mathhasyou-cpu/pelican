@@ -153,3 +153,17 @@ describe("история (NFR-09, UC-09)", () => {
     expect(monthOf(iso)).toBe(months[d.getMonth()] + " " + d.getFullYear());
   });
 });
+
+describe("отказ загрузки (UX: обещание повтора)", () => {
+  it("сбой сети не обещает повтора сам — даёт кнопку «Повторить»; 404 её не даёт", async () => {
+    vi.spyOn(A, "report").mockRejectedValueOnce(Object.assign(new Error("Нет связи с сервером. Проверьте сеть и повторите."), { status: 0 }));
+    render(<AppCtx.Provider value={app()}><Report name="20261019-170000" view="table" /></AppCtx.Provider>);
+    expect(await screen.findByRole("button", { name: /Повторить/ })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("повторит сама");
+    cleanup();
+    vi.spyOn(A, "report").mockRejectedValueOnce(Object.assign(new Error("не найдено"), { status: 404 }));
+    render(<AppCtx.Provider value={app()}><Report name="20261019-170001" view="table" /></AppCtx.Provider>);
+    await screen.findByRole("heading", { name: "Такого отчёта нет" });
+    expect(screen.queryByRole("button", { name: /Повторить/ })).toBeNull();
+  });
+});

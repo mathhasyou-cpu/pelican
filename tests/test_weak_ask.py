@@ -165,6 +165,26 @@ def test_card_blanks_uncited_sections() -> None:
     assert c.summaries == {1: "Статья о защите."}
 
 
+def test_card_strips_refs_beyond_evidence() -> None:
+    # Предложение держится на верной [1], а номер без источника висел в тексте ([25] при 15).
+    c = card_mod.parse(
+        {
+            "title": "Защита памяти агентов",
+            "description": "Проверка записей памяти [1, 25]. Подход описан в статье [1] [25].",
+            "hypothesis": "Память агентов станут проверять до использования [2][9].",
+            "facts": [],
+            "summaries": [],
+        },
+        "x",
+        CARD_EV,
+    )
+    assert c.description == "Проверка записей памяти [1]. Подход описан в статье [1]."
+    assert c.hypothesis == "Память агентов станут проверять до использования [2]."
+    a = parse({"kind": EMERGING, "stage": PILOT, "why": "Есть пилот [1] и раунд [7]."},
+              Candidate("x", "x", evidence=CARD_EV))
+    assert a.why == "Есть пилот [1] и раунд."
+
+
 def test_card_keeps_cited_advantage_without_latin_name() -> None:
     """Предложение со ссылкой и без чисел остаётся, даже если в нём нет латинского имени:
     так пишется большинство конкретных преимуществ (scripts/measure_card_drops.py)."""

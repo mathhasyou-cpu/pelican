@@ -27,7 +27,13 @@ it("этап, направления, вердикты и переход в го
   expect(document.querySelector("#facets").textContent).toContain("платежи");   // и чипом, и сектором радара
   expect(screen.getByText("Раунд.")).toBeTruthy();   // ссылки [n] в ленте сняты
   expect(screen.getByText("2 из 3, сигналов 1, снято 1")).toBeTruthy();
-  await waitFor(() => expect(app.navTo).toHaveBeenCalledWith("report=20261019-170000", { view: "radar" }));
+  // axe button-name (NFR-72): у каждой точки радара в дереве доступности есть имя; безымянная — скрыта
+  const dots = [...document.querySelectorAll("button.dot")];
+  expect(dots.length).toBe(3);
+  expect(dots.filter((b) => b.getAttribute("aria-hidden") !== "true").every((b) => b.getAttribute("aria-label"))).toBe(true);
+  expect(dots.filter((b) => b.getAttribute("aria-hidden") === "true")).toHaveLength(1);
+  // replace: «Назад» с отчёта не должен возвращать на ожидание, которое снова откроет отчёт
+  await waitFor(() => expect(app.navTo).toHaveBeenCalledWith("report=20261019-170000", { view: "radar", replace: true }));
 });
 
 it("уход из очереди в работу виден без событий этапа и без перезагрузки", async () => {

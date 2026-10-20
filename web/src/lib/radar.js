@@ -326,11 +326,12 @@ import { stageIndex } from "./stages.js";
     el.addEventListener("animationend", function () { el.classList.remove("turn"); }, { once: true });
   };
 
-  /* N безымянных кандидатов у края, в полосе «за кругом», — после сведения. */
+  /* N безымянных кандидатов у края, в полосе «за кругом», — после сведения. До вердикта у точки
+     нет имени, это декор: aria-hidden, иначе axe button-name (NFR-72); имя даёт `_style`. */
   Radar.prototype.scatter = function (n) {
     for (var i = 0; i < n; i++) {
       var b = document.createElement("button");
-      b.className = "dot pool"; b.type = "button"; b.tabIndex = -1;
+      b.className = "dot pool"; b.type = "button"; b.tabIndex = -1; b.setAttribute("aria-hidden", "true");
       var p = polar(rnd(this.poolSeed + 1) * 360, 43.6 + rnd(this.poolSeed + 99) * 2.8);
       this.poolSeed++;
       b.style.left = px(p.x); b.style.top = py(p.y);
@@ -392,6 +393,7 @@ import { stageIndex } from "./stages.js";
     el.textContent = top ? String(d.rank) : "";
     el.tabIndex = top ? 0 : -1;
     el.setAttribute("aria-label", d.title + (top ? ", № " + d.rank : "") + (d.state === "out" ? " — снято" : ", " + RING_SHORT[d.stage]));
+    el.removeAttribute("aria-hidden");
     el.removeAttribute("title");
   };
 

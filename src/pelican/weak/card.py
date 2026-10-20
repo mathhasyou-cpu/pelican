@@ -35,7 +35,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
-from pelican.weak.assess import Evidence
+from pelican.weak.assess import Evidence, keep_refs
 from pelican.weak.textcheck import quote_appears_in
 
 #: Свидетельство в промпте карточки: заголовок + аннотация/сниппет (`weak.deepen`).
@@ -228,7 +228,7 @@ def _clean(text: str, texts: list[str]) -> str:
             continue
         if invented_numbers(s, [texts[r - 1] for r in nums]):
             continue
-        kept.append(s)
+        kept.append(keep_refs(s, len(texts)))
     return " ".join(kept)
 
 
@@ -289,4 +289,4 @@ def _whole(text: str, texts: list[str]) -> str:
     nums = [r for r in refs(text) if 1 <= r <= len(texts)]
     if not nums or foreign_script(text) or invented_numbers(text, [texts[r - 1] for r in nums]):
         return ""
-    return text
+    return keep_refs(text, len(texts))

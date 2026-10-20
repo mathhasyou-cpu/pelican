@@ -14,7 +14,7 @@ import os
 import re
 import statistics
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +37,12 @@ MAX_ACTIVE_PER_CLIENT = 3
 #: Имя отчёта по BR-45: время старта прогона или служебный отчёт замера
 #: `tz-<запрос>-<время>` (`measure_ask.py --tz`). Управляющих символов и слэшей в имени нет.
 REPORT_NAME = re.compile(r"(tz-[^\x00-\x1f/\\]+-)?\d{8}-\d{6}")
+
+
+def report_stamp(started: datetime) -> str:
+    """Время в имени отчёта (BR-45) — UTC, как `started` в API. По часам хоста имя на стенде
+    UTC+6 расходилось со стартом на 6 ч, а в контейнере (TZ не задан) — нет."""
+    return f"{started.astimezone(UTC):%Y%m%d-%H%M%S}"
 
 
 class Busy(Exception):

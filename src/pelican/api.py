@@ -43,13 +43,15 @@ import traceback
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Path as PathParam
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.middleware.gzip import GZipMiddleware
 
 from pelican import events, failure, jobs
@@ -86,10 +88,16 @@ WATCHDOG_S = 60.0
 STUCK_RUNS = 2.0
 #: Соединений в пуле HTTP-маршрутов: запросы короткие, вкладок — единицы. ⚠️ Догадка.
 POOL_MAX = 8
+#: Потолок числовых параметров — BIGINT Postgres: больше psycopg шлёт `numeric`, и `OFFSET`/
+#: `id = %s` падают 500 вместо 422.
+BIGINT = 2**63 - 1
+#: Текст без NUL: Postgres не хранит `\x00` в `text`, psycopg отказывает исключением → 500.
+NO_NUL = r"^[^\x00]*$"
+JobId = Annotated[int, PathParam(ge=0, le=BIGINT)]
 
 
 class AskIn(BaseModel):
-    query: str
+    query: str = Field(pattern=NO_NUL)
 
 
 class Worker:
@@ -326,7 +334,7 @@ def create_app(url: str, runner: Runner | None, start_worker: bool = True) -> Fa
         return body
 
     @app.get("/api/jobs/{job_id}")
-    def job(job_id: int) -> dict:
+    def job(job_id: JobId) -> dict:
         with conn() as c:
             snap = jobs.snapshot(c, job_id)
             if snap is not None and snap["status"] in ("queued", "running"):
@@ -337,7 +345,7 @@ def create_app(url: str, runner: Runner | None, start_worker: bool = True) -> Fa
         return snap
 
     @app.get("/api/jobs/{job_id}/events")
-    def job_events(job_id: int, after: int = Query(0, ge=0)) -> dict:
+    def job_events(job_id: JobId, after: int = Query(0, ge=0, le=BIGINT)) -> dict:
         """События прогона после курсора `after`; `next` — курсор следующего опроса,
         `elapsed` — секунды от старта задания по часам сервера (None — ещё не стартовало)."""
         with conn() as c:
@@ -365,7 +373,7 @@ def create_app(url: str, runner: Runner | None, start_worker: bool = True) -> Fa
         }
 
     @app.post("/api/jobs/{job_id}/cancel")
-    def cancel(job_id: int, request: Request) -> dict:
+    def cancel(job_id: JobId, request: Request) -> dict:
         """Отмена своего задания: ожидающее — сразу, идущее — на границе стадии."""
         with conn() as c:
             try:
@@ -383,7 +391,9 @@ def create_app(url: str, runner: Runner | None, start_worker: bool = True) -> Fa
 
     @app.get("/api/history")
     def history(
-        limit: int = Query(50, ge=1, le=1000), offset: int = Query(0, ge=0), q: str = ""
+        limit: int = Query(50, ge=1, le=1000),
+        offset: int = Query(0, ge=0, le=BIGINT),
+        q: str = Query("", pattern=NO_NUL),
     ) -> dict:
         """Вся история с поиском по запросу и страницами.
 

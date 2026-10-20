@@ -23,11 +23,11 @@ export default function Report({ name, view, sig, cut, facet }) {
     A.report(name).then((r) => { if (live) setRep(r); }, (err) => {
       if (!live) return;
       setError(err.status === 404 ? { title: "Такого отчёта нет", text: "Ссылка устарела или набрана с ошибкой. Все готовые отчёты — в истории." }
-        : { title: "Отчёт не открылся", text: err.message });
+        : { title: "Отчёт не открылся", text: err.message, retry: true });
     });
     return () => { live = false; };
   }, [name]);
-  if (error) return <Fail title={error.title} text={error.text} />;
+  if (error) return <Fail title={error.title} text={error.text} retry={error.retry} />;
   if (!rep) return <Loading text="Открываю отчёт" />;
   return <Result rep={rep} view={view} want={sig} cutWanted={cut} facetWanted={facet} />;
 }

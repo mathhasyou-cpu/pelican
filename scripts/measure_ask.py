@@ -303,8 +303,8 @@ def _tz(store: Store, repeat: int) -> None:
                 history.annotate(result, history.prior_runs(past, query, result.started))
                 # BR-45: время в имени и `started` — старт прогона, не конец; префикс `tz-`
                 # помечает служебный отчёт замера.
-                started = datetime.fromisoformat(result.started).astimezone()
-                name = f"tz-{_slug(query)}-{started:%Y%m%d-%H%M%S}"
+                started = datetime.fromisoformat(result.started)
+                name = f"tz-{_slug(query)}-{jobs.report_stamp(started)}"
                 html, payload = page.render(result), page.to_json(result)
                 jobs.save_report(conn, name, query, started, payload, html)
             (ask_dir / f"{name}.html").write_text(html, encoding="utf-8")

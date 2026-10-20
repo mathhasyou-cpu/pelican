@@ -67,7 +67,8 @@ export default function App() {
   const navTo = useCallback((h, opts) => {
     nextOpts.current = opts || {};
     if (hashNow() !== h) {
-      try { history.pushState(null, "", h ? "#" + h : location.pathname + location.search); } catch { location.hash = h; }
+      const url = h ? "#" + h : location.pathname + location.search;
+      try { (opts && opts.replace ? history.replaceState : history.pushState).call(history, null, "", url); } catch { location.hash = h; }
     }
     show(h);
   }, [show]);

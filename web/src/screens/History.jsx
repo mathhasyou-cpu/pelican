@@ -14,7 +14,7 @@ export default function History() {
     return () => { live = false; };
   }, [app.loadHistory]);   // история перечитывается при каждом входе на экран
   if (state.loading) return <Loading text="Загружаю историю" />;
-  if (state.error) return <Fail title="История не загрузилась" text={state.error} />;
+  if (state.error) return <Fail title="История не загрузилась" text={state.error} retry />;
   const { total, items, typical } = app.hist;
   return (
     <>

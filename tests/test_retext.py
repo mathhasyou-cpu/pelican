@@ -25,3 +25,12 @@ def test_latin_titles_across_sections():
     result = {"signals": [{"label": "x", "title": "Latent Space Probing"}, {"label": "y", "title": "Зонд"}],
               "excluded": [{"label": "z", "title": "z"}], "thin": [], "watch": None}
     assert [x["label"] for x in rt.latin_titles(result)] == ["x", "z"]
+
+
+def test_fix_refs_drops_numbers_beyond_sources():
+    result = {"signals": [{"label": "x", "sources": [{}, {}], "description": "Раунд [2, 25]. Пилот [1].",
+                           "facts": [{"date": "2026-01", "text": "Сделка [3]."}], "why": "Есть [1]."}]}
+    assert rt.fix_refs(result) == 2
+    s = result["signals"][0]
+    assert s["description"] == "Раунд [2]. Пилот [1]." and s["facts"][0]["text"] == "Сделка."
+    assert s["why"] == "Есть [1]."
