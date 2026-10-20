@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS works (
     -- найденной строке — та же цена, от которой индекс избавляет.
     tsv          TSVECTOR  GENERATED ALWAYS AS (to_tsvector('simple', term_raw)) STORED
 );
+-- Когда работа попала в корпус (point-in-time по дате ДОСТУПНОСТИ, bitemporal data). Срез
+-- бэктеста сегодня режет по дате публикации, и месяцы перед срезом в нём полнее, чем были
+-- живьём (индексация отстаёт). NULL — работа собрана до появления колонки: дата сбора не
+-- известна, и подставлять её задним числом нельзя. Без DEFAULT: на 15 млн строк колонка
+-- добавляется без перезаписи таблицы, а дату ставит вставка (`Store.insert_works`).
+ALTER TABLE works ADD COLUMN IF NOT EXISTS collected_at TIMESTAMPTZ;
 
 -- Приём, названный моделью в работе. `role` — две разные оси у Yoon (2012): `proposes`
 -- даёт новизну, `uses` — диффузию, `reviews` — признак зрелости (обзоры пишут, когда
@@ -65,7 +71,7 @@ CREATE TABLE IF NOT EXISTS tech_group_members (
 CREATE TABLE IF NOT EXISTS jobs (
     id        BIGSERIAL   PRIMARY KEY,
     query     TEXT        NOT NULL,
-    status    TEXT        NOT NULL DEFAULT 'queued',  -- queued | running | done | failed
+    status    TEXT        NOT NULL DEFAULT 'queued',  -- queued | running | done | failed | cancelled
     created   TIMESTAMPTZ NOT NULL DEFAULT now(),
     started   TIMESTAMPTZ,
     finished  TIMESTAMPTZ,
@@ -76,6 +82,38 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs (status, id);
 -- IP пользователя: лимит активных заданий на адрес (`jobs.enqueue`). '' — без лимита.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client TEXT NOT NULL DEFAULT '';
+-- Отказ: `error` — фраза для пользователя, `error_detail` — сырой текст исключения.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS error_detail TEXT NOT NULL DEFAULT '';
+
+-- Структурные события прогона (`ask.run(on_event=...)`): стадии, направления, вердикты,
+-- ТОП. Их проигрывает живой экран ожидания (`web/`); строки `jobs.progress` — для журнала
+-- и полосы ожидания без событий. `at` — секунды от старта задания. Хранятся у последних заданий
+-- (`jobs.prune_events`): старые нужны только медиане этапов.
+CREATE TABLE IF NOT EXISTS job_events (
+    seq    BIGSERIAL PRIMARY KEY,
+    job_id BIGINT    NOT NULL REFERENCES jobs (id) ON DELETE CASCADE,
+    at     REAL      NOT NULL,
+    kind   TEXT      NOT NULL,
+    data   JSONB     NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS job_events_job ON job_events (job_id, seq);
+-- Таблица, созданная без ключа: сироты вон, ключ добавить (повторный запуск — ничего).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'job_events'::regclass AND contype = 'f'
+    ) THEN
+        DELETE FROM job_events e WHERE NOT EXISTS (SELECT 1 FROM jobs j WHERE j.id = e.job_id);
+        ALTER TABLE job_events
+            ADD CONSTRAINT job_events_job_id_fkey FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- Время последней строки прогресса: сторож исполнителя снимает задание, у которого оно стоит.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS touched TIMESTAMPTZ;
+-- Автор попросил остановить идущее задание: исполнитель снимает его на границе стадии.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS cancel BOOLEAN NOT NULL DEFAULT false;
 
 -- Готовые ответы: результат целиком (JSON) и страница-отчёт (HTML).
 CREATE TABLE IF NOT EXISTS reports (
@@ -86,6 +124,15 @@ CREATE TABLE IF NOT EXISTS reports (
     html     TEXT        NOT NULL
 );
 CREATE INDEX IF NOT EXISTS reports_started ON reports (started DESC);
+-- Сводка для истории (`jobs.summary_of`): числа без чтения `result`. NULL — дописывается
+-- при первом чтении истории.
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS summary JSONB;
+-- `started` — старт прогона (BR-45). Строки, где в нём записан конец (старт + секунды),
+-- берут старт из самого результата; на исправленных строках условие ложно — повтор ничего не
+-- меняет (PQA-002).
+UPDATE reports SET started = (result->>'started')::timestamptz
+WHERE result->>'started' ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+  AND started - (result->>'started')::timestamptz > interval '60 seconds';
 
 -- @indexes
 CREATE INDEX IF NOT EXISTS works_tsv      ON works USING GIN (tsv);

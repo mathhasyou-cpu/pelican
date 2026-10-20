@@ -88,14 +88,16 @@ _last_call = 0.0
 _per_min = START_PER_MIN
 #: Источник закрыт до конца прогона: OPS сказал «робот» или выдал чёрный цвет.
 _shut = ""
+#: `time.monotonic()`, после которого новых запросов не делается (бюджет времени `ask.run`).
+_deadline: float | None = None
 
 _THROTTLE = re.compile(r"(\w+)=(\w+):(\d+)")
 
 
 def reset() -> None:
     """Забыть состояние троттлинга. Нужно тестам и новому прогону."""
-    global _per_min, _shut, _token
-    _per_min, _shut, _token = START_PER_MIN, "", None
+    global _per_min, _shut, _token, _deadline
+    _per_min, _shut, _token, _deadline = START_PER_MIN, "", None, None
 
 
 def closed() -> str:
@@ -178,21 +180,32 @@ async def _get(http: httpx.AsyncClient, path: str, params: dict) -> httpx.Respon
     об этом вслух — молчаливая деградация здесь хуже отсутствующего источника.
 
     ⚠️ Занятость (`503`) — другое дело: она проходит, и одна попытка повтора уместна.
+
+    ⚠️ Сетевой отказ (выдача токена, таймаут, обрыв) и исчерпанный бюджет времени запроса
+    тоже закрывают источник, а не бросают исключение: патенты идут на 12–16-й минуте
+    прогона, и отказ ради одной строки карточки не должен терять всю выдачу.
     """
-    global _last_call
+    global _last_call, _shut
     if _shut:
         return None
     for attempt in range(2):
         gap = 60.0 / max(_per_min, 1) - (time.monotonic() - _last_call)
+        if _deadline is not None and time.monotonic() + max(gap, 0.0) > _deadline:
+            _shut = "не проверялись дальше: исчерпан бюджет времени запроса"
+            return None
         if gap > 0:
             await asyncio.sleep(gap)
         _last_call = time.monotonic()
-        token = await _access_token(http)
-        r = await http.get(
-            f"{BASE}/rest-services/{path}",
-            params=params,
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
-        )
+        try:
+            token = await _access_token(http)
+            r = await http.get(
+                f"{BASE}/rest-services/{path}",
+                params=params,
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            )
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            _shut = f"OPS не ответил ({type(exc).__name__}) — патенты дальше не проверялись"
+            return None
         _read_throttle(r.headers)
         if r.status_code == 403 and "RobotDetected" in r.text:
             globals()["_shut"] = "OPS: CLIENT.RobotDetected — поиск закрыт, темп был превышен"
@@ -381,14 +394,21 @@ async def _gather(phrases: list[str], with_docs: bool) -> dict[str, Activity]:
     return out
 
 
-def activity(phrases: list[str], with_docs: bool = True) -> dict[str, Activity]:
+def activity(
+    phrases: list[str], with_docs: bool = True, deadline: float | None = None
+) -> dict[str, Activity]:
     """Патентная активность по списку фраз. Пустой словарь, если источник выключен.
 
     ⚠️ Состояние троттлинга сбрасывается на каждый прогон: «закрыто» — приговор ПРОГОНУ,
     а не процессу, иначе один неудачный запрос навсегда выключил бы источник в
     `ask-serve`, который живёт неделями.
+
+    `deadline` — `time.monotonic()`, после которого запросы не идут: OPS назначает темп
+    сам (до 1 запроса в минуту), и без потолка патенты пробивали бы 20 минут прогона.
     """
+    global _deadline
     if not enabled():
         return {}
     reset()
+    _deadline = deadline
     return asyncio.run(_gather(phrases, with_docs))

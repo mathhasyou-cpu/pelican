@@ -35,6 +35,7 @@ Keycard, NewCore и Hush Security, а «cybersecurity startup raises» — об�
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -42,7 +43,7 @@ import httpx
 
 from pelican.config import settings
 from pelican.llm import LLMClient
-from pelican.weak.live import LiveDoc, news_many
+from pelican.weak.live import LiveDoc, news_many_measured
 from pelican.weak.tech import clean_tech
 
 #: ⚠️ ДОГАДКА: формулы по словарю обоснований датасета, не по замеру.
@@ -254,38 +255,73 @@ _NOT_A_NAME_START = frozenset(
 
 
 def named_in(text: str, candidates: list[str]) -> list[str]:
-    """Имена, которые ДЕЙСТВИТЕЛЬНО стоят в тексте — сравнение с учётом регистра.
+    """Имена, которые ДЕЙСТВИТЕЛЬНО стоят в тексте, — в том написании, что в тексте.
 
-    ⚠️ Регистр здесь и есть фильтр: компания в заголовке пишется с заглавной, а «ai»,
-    «security», «platform» — нет, и без этого правила в компании попадали слова темы.
+    Имя ищется отдельным словом (границы слова), без учёта регистра. ⚠️ Подстрокой нельзя:
+    «Meta» подтверждалась заголовком «Metamaterials startup raises…», «Arm» — «Armenia».
+    ⚠️ Регистр остаётся фильтром, но по НАПИСАНИЮ В ТЕКСТЕ: в нём обязана быть заглавная.
+    Компания в заголовке пишется с заглавной, а «ai», «security», «platform» в тексте — нет.
+    Первая буква не требуется: «iRobot», «eToro», «dbt Labs» стоят в заголовке дословно,
+    а «NVIDIA» при имени «Nvidia» — то же имя (PEL-H-05).
     """
     out: list[str] = []
     for raw in candidates:
         name = " ".join(str(raw or "").split()).strip(".,;:")
-        if len(name) < 2 or not name[0].isupper() or name not in text:
+        if len(name) < 2:
             continue
-        low = name.lower()
+        hit = re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text, re.IGNORECASE)
+        if hit is None:
+            continue
+        surface = hit.group(0)
+        if not any(ch.isupper() for ch in surface):
+            continue
+        low = surface.lower()
         if low in _NOT_COMPANY or any(w in low for w in _NOT_A_COMPANY_WORD):
             continue
         if low.split()[0] in _NOT_A_NAME_START:
             continue
-        if name.lower() not in {x.lower() for x in out}:
-            out.append(name)
+        if low not in {x.lower() for x in out}:
+            out.append(surface)
     return out
 
 
-def headlines(queries_en: list[str]) -> list[LiveDoc]:
-    """Заголовки по всем запросам, без повторов по заголовку."""
-    found = news_many(queries_en, "en")
+def headlines(queries_en: list[str]) -> tuple[list[LiveDoc], int]:
+    """(заголовки по всем запросам без повторов, сколько запросов не ответило и после повтора).
+
+    ⚠️ «Не ответил» считается отдельно от «пусто»: денежный поток — половина пула, и при
+    блокировке Google News он обнулялся молча, а ТОП собирался из одного научного потока
+    без единого слова на странице (PEL-H-02).
+    """
+    found = news_many_measured(queries_en, "en")
     seen: set[str] = set()
     out: list[LiveDoc] = []
     for docs in found:
-        for d in docs:
+        for d in docs or []:
             key = d.title.strip().lower()
             if key and key not in seen:
                 seen.add(key)
                 out.append(d)
-    return out
+    return out, sum(1 for docs in found if docs is None)
+
+
+@dataclass(frozen=True, slots=True)
+class Coverage:
+    """Сколько новостных запросов денежного потока задано и сколько не ответило."""
+
+    asked: int = 0
+    failed: int = 0
+
+    def note(self) -> str:
+        """Строка для отказов страницы; пусто — ответило больше половины.
+
+        ⚠️ Порог «половина» — догадка: одиночный отказ после повтора — шум, массовый —
+        блокировка, и тогда направления «по деньгам» неполны.
+        """
+        if not self.asked or self.failed * 2 < self.asked:
+            return ""
+        if self.failed == self.asked:
+            return f"не ответил ни на один из {self.asked} запросов — денежный поток не проверен"
+        return f"не ответил на {self.failed} из {self.asked} запросов — денежный поток неполон"
 
 
 def _client() -> LLMClient:
@@ -294,6 +330,7 @@ def _client() -> LLMClient:
         api_key=settings.llm_api_key,
         model=settings.llm_model,
         timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
 
 
@@ -367,6 +404,36 @@ def follow_up(terms: list[str], asked: set[str]) -> list[str]:
     return out
 
 
+def by_topic(docs: list[LiveDoc], queries: list[str]) -> list[LiveDoc]:
+    """Заголовки в порядке ближайшего запроса (косинус эмбеддингов), внутри — по близости.
+
+    Модель видит «общее для нескольких компаний» только внутри пачки `BATCH`, а порядок
+    заголовков — это порядок запросов × порядок Google: одна тема из двух запросов
+    расходилась по двум пачкам и давала два направления с разными ярлыками, а новый
+    порядок ответов перекладывал пачки — один из механизмов «6 из 15 позиций плывут»
+    (PEL-H-06). Приём — тематически плотные пачки: nearest-centroid по векторам, где
+    центроиды — сами запросы. Порядок зависит от набора заголовков, а не от их прихода.
+    Эмбеддер недоступен — порядок прежний: это уборка, а не условие выдачи.
+    Замер (125 заголовков запроса про долголетие, два случайных порядка тех же заголовков):
+    без сортировки 19 и 24 направления, общих 4 (Жаккар 0.10); с сортировкой 23 и 23, общих
+    23 (Жаккар 1.00). ⚠️ Это устойчивость к ПОРЯДКУ прихода; к составу ответов Google она
+    не относится — другой набор заголовков даст другие пачки.
+    """
+    if len(docs) <= BATCH or not queries:
+        return docs
+    from pelican.weak.ground import embed_texts
+
+    try:
+        titles = embed_texts([d.title for d in docs])
+        centres = embed_texts(queries)
+    except (httpx.HTTPError, ValueError):
+        return docs
+    sims = titles @ centres.T
+    near, best = sims.argmax(axis=1), sims.max(axis=1)
+    order = sorted(range(len(docs)), key=lambda i: (int(near[i]), -float(best[i]), docs[i].title))
+    return [docs[i] for i in order]
+
+
 async def _group(docs: list[LiveDoc], area: str = "") -> tuple[list[MoneyCandidate], list[str]]:
     client = _client()
     head = f"THE USER ASKED ABOUT: {area}\n\n" if area else ""
@@ -422,8 +489,8 @@ def companies_of(docs: list[LiveDoc]) -> list[tuple[str, ...]]:
 
 def candidates(
     queries_en: list[str], on_progress: Callable[[str], None] | None = None, area: str = ""
-) -> tuple[list[MoneyCandidate], int]:
-    """(направления, сколько заголовков просмотрено) — ДВА круга запросов.
+) -> tuple[list[MoneyCandidate], int, Coverage]:
+    """(направления, сколько заголовков просмотрено, покрытие запросов) — ДВА круга запросов.
 
     Второй круг идёт по сущностям, найденным в заголовках первого (`parse_terms`):
     широкий запрос отдаёт рынок, запрос по артефакту — тех, кто этот артефакт делает.
@@ -440,21 +507,24 @@ def candidates(
         if on_progress:
             on_progress(message)
 
-    docs = headlines(queries_en)
+    docs, failed = headlines(queries_en)
+    cover = Coverage(len(queries_en), failed)
     if not docs:
-        return [], 0
-    found, terms = asyncio.run(_group(docs, area))
+        return [], 0, cover
+    found, terms = asyncio.run(_group(by_topic(docs, queries_en), area))
     asked = {q.lower() for q in queries_en}
     more = follow_up(terms, asked)
     if not more:
-        return found, len(docs)
+        return found, len(docs), cover
     say(f"второй круг: {len(terms)} найденных сущностей, {len(more)} запросов")
     seen = {d.title.strip().lower() for d in docs}
-    extra = [d for d in headlines(more) if d.title.strip().lower() not in seen]
+    second, failed2 = headlines(more)
+    cover = Coverage(cover.asked + len(more), cover.failed + failed2)
+    extra = [d for d in second if d.title.strip().lower() not in seen]
     if not extra:
-        return found, len(docs)
+        return found, len(docs), cover
     say(f"второй круг: ещё {len(extra)} заголовков")
-    found2, _ = asyncio.run(_group(extra, area))
+    found2, _ = asyncio.run(_group(by_topic(extra, more), area))
     known = {c.label for c in found}
     found += [c for c in found2 if c.label not in known]
-    return found, len(docs) + len(extra)
+    return found, len(docs) + len(extra), cover

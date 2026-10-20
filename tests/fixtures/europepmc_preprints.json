@@ -1,0 +1,102 @@
+{
+ "version": "6.9",
+ "hitCount": 133,
+ "nextCursorMark": "AoJgKDU2MTc2Mjcx",
+ "nextPageUrl": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%22organoid%22+AND+%22microfluidic%22+AND+SRC%3APPR&cursorMark=AoJgKDU2MTc2Mjcx&resultType=lite&pageSize=3&sort=P_PDATE_D+desc&format=json",
+ "request": {
+  "queryString": "\"organoid\" AND \"microfluidic\" AND SRC:PPR",
+  "resultType": "lite",
+  "cursorMark": "*",
+  "pageSize": 3,
+  "sort": "P_PDATE_D desc",
+  "synonym": false
+ },
+ "resultList": {
+  "result": [
+   {
+    "id": "PPR1310404",
+    "source": "PPR",
+    "doi": "10.20944/preprints202608.2307.v1",
+    "title": "Materials and Surface Chemistry of Organ-on-Chip Microdevices: Polymer Networks, Interfacial Functionalization, and Small-Molecule Partitioning in Pharmaceutical Microphysiological Systems",
+    "authorString": "Odibo A.",
+    "pubYear": "2026",
+    "pubType": "preprint",
+    "bookOrReportDetails": {
+     "publisher": "Preprints.org",
+     "yearOfPublication": 2026
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "N",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasTMAccessionNumbers": "N",
+    "firstPublicationDate": "2026-08-31",
+    "firstIndexDate": "2026-09-03",
+    "versionNumber": 1
+   },
+   {
+    "id": "PPR1308760",
+    "source": "PPR",
+    "doi": "10.21203/rs.3.rs-9510258/v1",
+    "title": "3D µEFPocket for Multimodal Communications with Brain Organoids",
+    "authorString": "Wang Y, Cuevas M, Zhang Z, Chung G, Zhang J, Yin Y, Luo Q, Lipman W, Henderson J, Lu L, Zeng W, Zhang A, Jia C, Luan H, Stein J, Bai W.",
+    "pubYear": "2026",
+    "pubType": "preprint",
+    "bookOrReportDetails": {
+     "publisher": "Research Square",
+     "yearOfPublication": 2026
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasTMAccessionNumbers": "N",
+    "firstPublicationDate": "2026-08-31",
+    "firstIndexDate": "2026-09-01",
+    "versionNumber": 1
+   },
+   {
+    "id": "PPR1302039",
+    "source": "PPR",
+    "doi": "10.21203/rs.3.rs-10547160/v1",
+    "title": "Recapitulating SARS-CoV-2 Infection in a Human Lung Organoid-on-a-Chip at the Air-Liquid Interface",
+    "authorString": "Park S, Kim S, Kim B, Eo E, Kim H, Jeong Y, Park J, Cho Y.",
+    "pubYear": "2026",
+    "pubType": "preprint",
+    "bookOrReportDetails": {
+     "publisher": "Research Square",
+     "yearOfPublication": 2026
+    },
+    "isOpenAccess": "N",
+    "inEPMC": "N",
+    "inPMC": "N",
+    "citedByCount": 0,
+    "hasReferences": "N",
+    "hasTextMinedTerms": "Y",
+    "hasDbCrossReferences": "N",
+    "hasPDF": "N",
+    "hasBook": "N",
+    "hasSuppl": "N",
+    "hasLabsLinks": "N",
+    "hasTMAccessionNumbers": "N",
+    "firstPublicationDate": "2026-08-20",
+    "firstIndexDate": "2026-08-22",
+    "versionNumber": 1
+   }
+  ]
+ }
+}

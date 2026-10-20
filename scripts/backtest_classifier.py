@@ -59,9 +59,14 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from pelican import locks  # noqa: E402
 from pelican.config import settings  # noqa: E402
+from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.store import Store  # noqa: E402
-from pelican.weak import asof  # noqa: E402
+from pelican.weak import (
+    asof,  # noqa: E402
+    rounds,  # noqa: E402
+)
 from pelican.weak import model as model_mod  # noqa: E402
 from pelican.weak.assess import (  # noqa: E402
     CORPUS,
@@ -87,7 +92,6 @@ from pelican.weak.dataset import (  # noqa: E402
 from pelican.weak.kinds import EMERGING  # noqa: E402
 from pelican.weak.live import LiveDoc  # noqa: E402
 from pelican.weak.neighbours import neighbourhoods  # noqa: E402
-from pelican.weak import rounds  # noqa: E402
 from pelican.weak.rounds import MoneyTrace, trace  # noqa: E402
 from pelican.weak.stats import span  # noqa: E402
 
@@ -99,6 +103,10 @@ _spec.loader.exec_module(judge_match)
 #: Порог роста — тот же, что в `backtest_signals.py`. ⚠️ На корпусе про ИИ его проходят
 #: 170 из 196 — исход почти не делит; основной исход — избыточный рост (`outcomes`).
 GROWTH = 2.0
+#: Минимальная база ядра на срезе — та же, что `backtest_signals.MIN_BASE`: ниже неё исход
+#: роста не определён («появилась ли работа», PEL-G-06), строка не входит ни в медиану
+#: домена, ни в положительные/отрицательные. ⚠️ 5 — догадка.
+MIN_BASE = 5
 SHUFFLES = 200
 #: Верхняя доля домена по избыточному росту, считаемая «взлетело».
 TOP_SHARE = 1 / 3
@@ -286,22 +294,41 @@ def outcomes(rows: list[dict]) -> None:
     знаменатель — тот же признак `money_last_n`, и такой исход — регрессия к среднему.
     """
     _excess(rows, "log_ratio", "excess", "grew_excess", "top_tercile")
-    _excess(rows, "log_money", "money_excess", "money_grew", "money_top")
+    # Денежный след не мерили (`--no-money`) — денежные исходы пустые, а не нулевые.
+    money = all(r["money_after_n"] != "" for r in rows)
+    if money:
+        _excess(rows, "log_money", "money_excess", "money_grew", "money_top")
     for r in rows:
-        r["grew"] = int(float(r["во сколько раз"]) >= GROWTH)
+        # Тонкая база — исход роста не определён: пусто, а не 0 (PEL-G-06).
+        r["grew"] = "" if _thin(r) else int(float(r["во сколько раз"]) >= GROWTH)
+        if not money:
+            r["log_money"] = r["money_excess"] = r["money_grew"] = r["money_top"] = ""
+            r["money_ratio"] = ""
+            continue
         last = float(r.get("money_last_n") or 0)
         r["money_ratio"] = round(math.log((float(r["money_after_n"]) / 2 + 1) / (last + 1)), 3)
 
 
+def _thin(r: dict) -> bool:
+    return str(r.get("тонкая база", "0")) == "1"
+
+
 def _excess(rows: list[dict], value: str, excess: str, above: str, top: str) -> None:
-    """Значение сверх медианы домена, флаги «выше медианы» и «верхняя треть»."""
+    """Значение сверх медианы домена, флаги «выше медианы» и «верхняя треть».
+
+    ⚠️ Для роста следа строки с тонкой базой (`MIN_BASE`) не участвуют ни в медиане, ни в
+    исходе: при массе нулей медиана домена становилась самой константой кодирования, и
+    `grew_excess` делил домен на «работа появилась / не появилась» (PEL-G-06).
+    """
+    growth = value == "log_ratio"
     by_domain: dict[str, list[float]] = {}
     for r in rows:
-        if value == "log_ratio":
+        if growth:
             r[value] = math.log(max(float(r["во сколько раз"]), 0.05))
         else:
             r[value] = math.log1p(float(r["money_after_n"]))
-        by_domain.setdefault(r["домен"], []).append(r[value])
+        if not (growth and _thin(r)):
+            by_domain.setdefault(r["домен"], []).append(r[value])
     median = {d: statistics.median(v) for d, v in by_domain.items()}
     cutoff = {
         d: sorted(v, reverse=True)[max(int(len(v) * TOP_SHARE) - 1, 0)]
@@ -309,6 +336,9 @@ def _excess(rows: list[dict], value: str, excess: str, above: str, top: str) -> 
     }
     for r in rows:
         d = r["домен"]
+        if (growth and _thin(r)) or d not in median:
+            r[excess] = r[above] = r[top] = ""
+            continue
         r[excess] = round(r[value] - median[d], 3)
         r[above] = int(r[value] > median[d])
         # ⚠️ Верхняя треть по денежному исходу при медиане 0 — «≥ порога», но порог может
@@ -367,6 +397,12 @@ def main() -> None:
         "--embed",
         action="store_true",
         help="соседство в векторах под срезом (E): проход по шардам; без покрытия окон — пусто",
+    )
+    ap.add_argument(
+        "--no-money",
+        action="store_true",
+        help="без денежного следа (Google News, ~4000 запросов на срез): столбцы `$` и денежные "
+        "исходы пустые; модели роста (`--in-query`, `grew_excess`) они не нужны",
     )
     args = ap.parse_args()
     folder = REPO / args.dir
@@ -447,11 +483,15 @@ def main() -> None:
     # того — признаки. Один и тот же инструмент, чтобы исход и признак мерялись одинаково.
     labels = [c["label"] for c in cands]
     say = lambda m: print(f"  {m}", flush=True)  # noqa: E731
-    after = trace(labels, cut, cut + timedelta(days=730), say)
-    last = trace(labels, cut - timedelta(days=365), cut, say)
-    prev = trace(labels, cut - timedelta(days=730), cut - timedelta(days=365), say)
-    zeros = sum(t.empty for t in after)
-    print(f"  после среза без денежных заголовков: {zeros} из {len(after)}")
+    if args.no_money:
+        print("  денежный след пропущен (--no-money): столбцы `$` пустые")
+        after = last = prev = [None] * len(labels)
+    else:
+        after = trace(labels, cut, cut + timedelta(days=730), say)
+        last = trace(labels, cut - timedelta(days=365), cut, say)
+        prev = trace(labels, cut - timedelta(days=730), cut - timedelta(days=365), say)
+        zeros = sum(t.empty for t in after)
+        print(f"  после среза без денежных заголовков: {zeros} из {len(after)}")
 
     out_rows = []
     for c, row, a, t_after, t_last, t_prev in zip(cands, rows, got, after, last, prev, strict=True):
@@ -459,8 +499,11 @@ def main() -> None:
         j_feats = judgment_features(a)
         e_feats = embed_features(row)
         m_feats = momentum_features(c, cut, at_cut, year_before)
-        d_feats = money_features(
-            t_last, t_prev, cut, industry.get(str(c.get("core") or c["label"]))
+        industry_of = industry.get(str(c.get("core") or c["label"]))
+        d_feats = (
+            money_features(t_last, t_prev, cut, industry_of)
+            if t_last is not None
+            else {**dict.fromkeys(MONEY_FEATURES), "industry_share": industry_of}
         )
         feats = {
             **n_feats,
@@ -486,9 +529,11 @@ def main() -> None:
                 "предикторы": "; ".join(pred.predictors),
                 "p роста": p_growth,
                 "во сколько раз": ratio,
-                "новостей после среза": int(g.get("новостей после среза") or 0),
-                "money_after_n": t_after.n,
-                "money_after_usd": round(t_after.usd),
+                "тонкая база": int(not g or float(g.get("работ на срезе") or 0) < MIN_BASE),
+                # Пустая клетка `backtest.tsv` — «не проверено», переносится пустой.
+                "новостей после среза": str(g.get("новостей после среза") or "").strip(),
+                "money_after_n": t_after.n if t_after is not None else "",
+                "money_after_usd": round(t_after.usd) if t_after is not None else "",
                 **{k: _cell(m_feats[k]) for k in MOMENTUM_FEATURES},
                 **{k: _cell(d_feats[k]) for k in MONEY_FEATURES},
                 **{k: _cell(j_feats[k]) for k in JUDGMENT_FEATURES},
@@ -520,13 +565,19 @@ def main() -> None:
         scorers["модель роста (p)"] = [float(r["p роста"] or 0) for r in out_rows]
     summary: dict[str, dict] = {}
     for outcome in ("grew", "grew_excess", "top_tercile", "money_grew", "money_top"):
-        flags = [bool(r[outcome]) for r in out_rows]
+        # Пустой исход (тонкая база) — ни положительный, ни отрицательный.
+        keep = [r[outcome] != "" for r in out_rows]
+        if not any(keep):
+            print(f"\n=== исход «{outcome}» не измерен (--no-money) ===")
+            continue
+        flags = [bool(r[outcome]) for r, k in zip(out_rows, keep, strict=True) if k]
         n_pos = sum(flags)
         print(
             f"\n=== РАЗДЕЛЕНИЕ по исходу «{outcome}» (AUC Манна–Уитни; "
-            f"положительных {n_pos} из {len(flags)}) ==="
+            f"положительных {n_pos} из {len(flags)}, без исхода {keep.count(False)}) ==="
         )
-        for name, scores in scorers.items():
+        for name, all_scores in scorers.items():
+            scores = [s for s, k in zip(all_scores, keep, strict=True) if k]
             pos = [s for s, g in zip(scores, flags, strict=True) if g]
             neg = [s for s, g in zip(scores, flags, strict=True) if not g]
             got_auc = auc(pos, neg)
@@ -539,7 +590,10 @@ def main() -> None:
     # уровень денег после среза предсказывается уровнем до него (широкая категория остаётся
     # широкой), а не зарождением. ⚠️ Подмножество определено ПОСЛЕ первого прогона
     # (post-hoc) на срезе 2024; слово «предсказывает» — только после среза 2022 (§86).
-    zero_idx = [i for i, r in enumerate(out_rows) if float(r["money_last_n"] or 0) == 0]
+    measured = not args.no_money
+    zero_idx = [
+        i for i, r in enumerate(out_rows) if measured and float(r["money_last_n"] or 0) == 0
+    ]
     zero = [out_rows[i] for i in zero_idx]
     flags = [float(r["money_after_n"]) > 0 for r in zero]
     print(
@@ -619,4 +673,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Модель одна на стенд (NFR-26): исполнитель API держит тот же замок — «занято» = код 75.
+    try:
+        with locks.hold(MODEL_LOCK):
+            main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

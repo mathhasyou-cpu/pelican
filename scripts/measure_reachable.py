@@ -67,8 +67,8 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import httpx  # noqa: E402
 
 from pelican.config import settings  # noqa: E402
-from pelican.store import Store  # noqa: E402
 from pelican.llm import LLMClient  # noqa: E402
+from pelican.store import Store  # noqa: E402
 from pelican.weak.ground import ground  # noqa: E402
 from pelican.weak.live import news_many  # noqa: E402
 from pelican.weak.names import discriminating, document_frequency, tokens  # noqa: E402

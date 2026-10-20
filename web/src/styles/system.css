@@ -1,0 +1,451 @@
+/* АС ПЕЛИКАН — визуальная система продукта (pelican.html, print.html).
+   Тёплая бумажная шкала: белые рабочие поверхности с едва заметной тенью на поле цвета слоновой
+   кости, чернила с тёплым подтоном, один акцент — жёлтый «блип».
+   Шрифт «Прибор» (style.html): одно семейство TikTok Sans в трёх ширинах — широкое (знак АС ПЕЛИКАН
+   и показания: часы, KPI, уверенность), обычное (текст и заголовки), узкое (подписи, легенды, шапки
+   таблиц). Без капса, кроме знака; цифры табличные. Логотип — словесный знак (.wm).
+   Сетка 4 px, скругления по вложенности: поверхность 16 → контрол 10 → мелочь 6.
+   Варианты 1–4 (исследование) живут на tokens.css, этот файл их не касается. */
+
+:root {
+  color-scheme: light;
+  --bg: #F4F2ED;
+  --surface: #FFFFFF;
+  --surface-2: #F8F6F2;   /* подложка внутри поверхности, наведение */
+  --surface-3: #EDEAE4;   /* трек переключателя, нажатое */
+  --line: #E8E4DD;
+  --line-2: #D4CFC6;
+  --ink: #15140F;
+  --ink-2: #3E3B35;
+  --muted: #736E65;
+  --accent: #F2C230;      /* единственный цвет: блип, уверенность, выбранное */
+  --accent-2: #D9A80F;    /* штрих и полоса на белом, где жёлтый слишком светел */
+  --ref: #7F5F00;         /* текст цветом акцента (ссылки [n]): ≥ 4,5 : 1 на всех светлых фонах (NFR-72) */
+  --accent-soft: #FCEDB9;
+  --accent-ink: #1C1806;
+  --water: #2F6FE4;       /* только знак: вода, в которую ныряет пеликан */
+  --cut: #A9A49B;         /* снятое — серым */
+  --track: #ECE9E3;
+  --focus: #15140F;
+  /* пояса радара: от центра (раннее внедрение) к краю (концепция) — светлее */
+  --band-0: #D9D4CA; --band-1: #E4E0D8; --band-2: #EEEBE5; --band-3: #F7F5F1;
+
+  --sh-1: 0 1px 2px rgb(40 34 20 / .04);
+  --sh-2: 0 1px 2px rgb(40 34 20 / .03), 0 12px 32px -14px rgb(40 34 20 / .14);
+  --sh-3: 0 2px 6px rgb(40 34 20 / .05), 0 28px 64px -14px rgb(40 34 20 / .24);
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px; --sp-20: 80px;
+
+  /* шкала из девяти ступеней: 12, 13, 14, 15, 17, 21, 28, h1, display; --fs-md 16 — только поля ввода (iOS не увеличивает) */
+  --fs-xs: 12px; --fs-sm: 13px; --fs-ui: 14px; --fs-base: 15px; --fs-md: 16px; --fs-lg: 17px; --fs-xl: 21px;
+  --fs-2xl: 28px;
+  --fs-3xl: clamp(30px, 2.2vw + 14px, 44px);
+  --fs-4xl: clamp(40px, 3.8vw + 12px, 68px);
+
+  --r-xs: 6px; --r-sm: 8px; --r-md: 10px; --r-lg: 16px; --r-xl: 24px; --r-full: 999px;
+
+  --sans: "TikTok Sans", "Roboto Flex", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Mono", Consolas, monospace;   /* только настоящий код (.code), без веб-шрифта */
+  --wide: 125%;     /* знак и показания */
+  --narrow: 80%;    /* подписи */
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --t-fast: 120ms; --t-mid: 200ms; --t-slow: 360ms;
+  --header-h: 60px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E0D0B; --surface: #171613; --surface-2: #1E1D19; --surface-3: #292722;
+    --line: #27251F; --line-2: #3A372F;
+    --ink: #EFEDE7; --ink-2: #C4C0B6; --muted: #8F8A7F;
+    --accent: #F2C230; --accent-2: #F2C230; --accent-soft: #3A3115; --accent-ink: #16130A; --ref: #F2C230; --water: #4D8BFF;
+    --cut: #6F6B62; --track: #292722; --focus: #EFEDE7;
+    --band-0: #3B3832; --band-1: #302E29; --band-2: #262420; --band-3: #1D1C19;
+    --sh-1: 0 0 0 1px rgb(255 255 255 / .02);
+    --sh-2: 0 1px 0 rgb(255 255 255 / .03) inset, 0 10px 30px -12px rgb(0 0 0 / .6);
+    --sh-3: 0 1px 0 rgb(255 255 255 / .04) inset, 0 28px 70px -12px rgb(0 0 0 / .75);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E0D0B; --surface: #171613; --surface-2: #1E1D19; --surface-3: #292722;
+  --line: #27251F; --line-2: #3A372F;
+  --ink: #EFEDE7; --ink-2: #C4C0B6; --muted: #8F8A7F;
+  --accent: #F2C230; --accent-2: #F2C230; --accent-soft: #3A3115; --accent-ink: #16130A; --ref: #F2C230; --water: #4D8BFF;
+  --cut: #6F6B62; --track: #292722; --focus: #EFEDE7;
+  --band-0: #3B3832; --band-1: #302E29; --band-2: #262420; --band-3: #1D1C19;
+  --sh-1: 0 0 0 1px rgb(255 255 255 / .02);
+  --sh-2: 0 1px 0 rgb(255 255 255 / .03) inset, 0 10px 30px -12px rgb(0 0 0 / .6);
+  --sh-3: 0 1px 0 rgb(255 255 255 / .04) inset, 0 28px 70px -12px rgb(0 0 0 / .75);
+}
+
+/* ---- основа ---- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + var(--sp-4)); overflow-x: clip; }
+body {
+  margin: 0; min-height: 100vh;
+  background: var(--bg); color: var(--ink);
+  font: 400 var(--fs-base)/1.55 var(--sans);
+  font-optical-sizing: auto; font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-xs); }
+button, input, textarea { font: inherit; color: inherit; }
+h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img, svg { display: block; max-width: 100%; }
+::selection { background: var(--accent-soft); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+
+/* ---- типографика ---- */
+/* «Прибор»: роли текста. Каждая роль задана здесь один раз; экранные файлы подключают свои селекторы
+   к этим группам, а не пишут свои кегли и начертания. */
+/* крупный оптический кегль TikTok Sans уже плотный — трекинг только чуть поджимает */
+.display { font-size: var(--fs-4xl); line-height: 1.04; font-weight: 600; letter-spacing: -0.012em; text-wrap: balance; }
+.h1, .atitle { font-size: var(--fs-3xl); line-height: 1.1; font-weight: 600; letter-spacing: -0.008em; text-wrap: balance; }
+.h2, .asec h2, .gsec h2 { font-size: var(--fs-2xl); line-height: 1.18; font-weight: 600; letter-spacing: -0.005em; text-wrap: balance; }
+.h3, .card header h2, .rq, .tq, .mh h2 { font-size: var(--fs-xl); line-height: 1.24; font-weight: 600; letter-spacing: -0.005em; text-wrap: balance; }
+.sq, .alist .at { font-size: var(--fs-lg); line-height: 1.3; font-weight: 600; }
+.lead { font-size: var(--fs-lg); line-height: 1.55; color: var(--ink-2); max-width: 64ch; text-wrap: pretty; }
+.small { font-size: var(--fs-sm); }
+/* подпись: узкое начертание, строчные, без разрядки — вместо капса и моноширинного */
+.label, th, .card h3, .cmdk-g, .hgroup h3, .rdiff h4, .mlabel, .newon > b, .gex .gh, .radar-key .h, .kicker, .eyebrow {
+  font-size: var(--fs-xs); line-height: 1.3; font-weight: 600; font-stretch: var(--narrow); letter-spacing: 0; text-transform: none; }
+/* метка сигнала (англ.) — узким, приглушённо */
+.card header .lab, .reg .lab { font-stretch: var(--narrow); font-size: var(--fs-sm); line-height: 1.35; color: var(--muted); }
+/* показания прибора: широкое начертание, табличные цифры */
+.num, .pclock .el, .stat .v, .kpis dd, .rstats dd, .card .conf .mono { font-stretch: var(--wide); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* словесный знак АС ПЕЛИКАН — логотип: заглавные широким начертанием, полужирным, с разрядкой */
+.wm { display: inline-block; white-space: nowrap; line-height: 1; color: inherit; font-family: var(--sans); font-stretch: 125%; font-weight: 700; letter-spacing: .06em; margin-right: -.06em; }
+.mono { font-variant-numeric: tabular-nums; }   /* табличные цифры гротеска */
+.code { font-family: var(--mono); font-size: .92em; }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+.cut { color: var(--cut); }
+.t13 { font-size: var(--fs-sm); }
+
+/* ---- каркас ---- */
+.app { max-width: 1440px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 40px); }
+.grow { flex: 1; }
+.row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hidden { display: none !important; }
+
+/* ---- шапка: липкая, полупрозрачная ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 20; height: var(--header-h);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5);
+  border-bottom: 1px solid var(--line);
+  view-transition-name: topbar;
+}
+.topbar .app { height: 100%; display: flex; align-items: center; gap: var(--sp-2); }
+.brand { display: inline-flex; align-items: center; font-size: var(--fs-lg); text-decoration: none; margin-right: var(--sp-6); color: var(--ink); border-radius: var(--r-xs); }
+
+/* ---- кнопки ---- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  height: 40px; padding: 0 var(--sp-4);
+  border: 1px solid var(--line-2); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink); box-shadow: var(--sh-1);
+  font-size: var(--fs-ui); font-weight: 500; line-height: 1; white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
+}
+.btn:hover { background: var(--surface-2); border-color: var(--muted); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.btn.primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn.accent, .btn.mark { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.accent:hover, .btn.mark:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.btn.quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); }
+.btn.quiet:hover { background: var(--surface-3); color: var(--ink); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.sm { height: 32px; padding: 0 var(--sp-3); border-radius: var(--r-sm); font-size: var(--fs-sm); }
+.btn.lg { height: 48px; padding: 0 var(--sp-5); font-size: var(--fs-md); border-radius: var(--r-md); }
+.btn.icon { width: 40px; padding: 0; }
+.btn.sm.icon { width: 32px; }
+.btn .ic { width: 18px; height: 18px; }
+.btn.sm .ic { width: 16px; height: 16px; }
+
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px;
+  border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: var(--r-xs);
+  background: var(--surface); color: var(--muted); font: 500 var(--fs-xs)/1 var(--sans); white-space: nowrap;
+}
+
+/* ---- поля ---- */
+.field {
+  width: 100%; height: 48px; padding: 0 var(--sp-4);
+  border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--surface);
+  font-size: var(--fs-md); transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.field::placeholder { color: var(--muted); }
+.field:focus { outline: none; border-color: var(--accent-2); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* ---- чипы, статусы ---- */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 var(--sp-3);
+  border: 1px solid var(--line-2); border-radius: var(--r-full); background: var(--surface);
+  font-size: var(--fs-sm); line-height: 1; white-space: nowrap; color: var(--ink-2);
+}
+.chip.solid { background: var(--surface-2); border-color: var(--line); }
+/* Оговорка к доверию (BR-20, BR-27): фраза, а не метка — переносится; рамка — как у «дольше обычного». */
+.chip.warn, .card header .chip.warn { height: auto; padding: 4px 10px; white-space: normal; line-height: 1.35; border-color: var(--accent-2); }
+.lab.warn { color: var(--ink-2); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lt { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: var(--r-xs); background: var(--ink); color: var(--surface); font: 600 var(--fs-xs)/1 var(--sans); flex: none; }
+
+.stamp {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 var(--sp-2);
+  border-radius: var(--r-full); font-size: var(--fs-xs); font-weight: 500; line-height: 1; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.stamp.signal { background: var(--accent); color: var(--accent-ink); }
+.stamp.cut { background: var(--surface-3); color: var(--ink-2); }   /* --muted на этой подложке < 4,5 : 1 (NFR-72) */
+.stamp.thin { border: 1px dashed var(--line-2); color: var(--ink-2); }
+
+/* маркер в тексте */
+.mark { background: var(--accent-soft); color: var(--ink); padding: 0 3px; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+/* полоса уверенности */
+.bar { position: relative; height: 6px; background: var(--track); border-radius: var(--r-full); overflow: hidden; }
+.bar > i { position: absolute; inset: 0 auto 0 0; background: var(--muted); border-radius: var(--r-full); transition: width var(--t-slow) var(--ease); }
+.bar.hi > i { background: var(--accent-2); }
+
+/* «идёт»: точка с расходящимся кольцом */
+.pulse { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 0 var(--accent); animation: live 1.6s var(--ease) infinite; }
+@keyframes live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--line-2); flex: none; }
+.dot.done { background: var(--ink); border-color: var(--ink); }
+
+/* таблицы */
+table { border-collapse: collapse; width: 100%; }
+th { text-align: left; color: var(--muted); height: 40px; border-bottom: 1px solid var(--line); padding: 0 var(--sp-3); white-space: nowrap; }
+td { height: 48px; padding: 0 var(--sp-3); border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* проверки */
+.checks li { display: grid; grid-template-columns: 20px 1fr; gap: var(--sp-1); padding: 6px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); line-height: 1.45; }
+.checks li:last-child { border-bottom: 0; }
+.checks .ok > span:first-child::before { content: "✓"; font-weight: 600; }
+.checks .no > span:first-child::before { content: "×"; color: var(--muted); }
+.checks .entry { color: var(--muted); }
+
+/* ---- поверхности ---- */
+/* --pad — внутренний отступ; полосы и таблицы внутри выходят к краям через отрицательное поле */
+.surface { --pad: var(--sp-6); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-1); padding: var(--pad); }
+.surface > .bar-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin: calc(var(--pad) * -1) calc(var(--pad) * -1) 0; padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-3); border-bottom: 1px solid var(--line); }
+.surface > .bar-bottom { margin: var(--pad) calc(var(--pad) * -1) calc(var(--pad) * -1); padding: var(--sp-3) var(--pad); border-top: 1px solid var(--line); background: var(--surface-2); border-radius: 0 0 var(--r-lg) var(--r-lg); }
+.flush { margin-left: calc(var(--pad) * -1); margin-right: calc(var(--pad) * -1); }
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-2); padding: var(--sp-6) var(--sp-6) var(--sp-4); }
+.sheet.signal { box-shadow: inset 0 4px 0 var(--accent), var(--sh-2); }
+.sheet .card { padding: 0; }
+.tile-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.tile-head h2 { font-size: var(--fs-ui); font-weight: 600; color: var(--ink); }
+
+/* ---- иконки: сетка 21, штрих 1.6 ---- */
+.ic { width: 20px; height: 20px; flex: none; stroke: currentColor; stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; display: inline-block; }
+
+/* ---- переключатель-сегменты ---- */
+.switch { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-3); border-radius: var(--r-md); }
+.switch button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; height: 30px; padding: 0 var(--sp-3); border-radius: 7px; font-size: var(--fs-sm); font-weight: 500; color: var(--ink-2); cursor: pointer; transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast); }
+.switch button:hover { color: var(--ink); }
+.switch button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .1), 0 0 0 1px var(--line); }
+.switch button .ic { width: 16px; height: 16px; }
+.switch.sm button { height: 24px; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
+
+/* ---- тост ---- */
+.toast { position: fixed; left: 50%; bottom: var(--sp-6); transform: translateX(-50%); display: inline-flex; align-items: center; gap: var(--sp-2); padding: 10px var(--sp-4) 10px var(--sp-3); background: var(--ink); color: var(--surface); border-radius: var(--r-full); box-shadow: var(--sh-3); font-size: var(--fs-ui); z-index: 50; animation: toast-in var(--t-mid) var(--ease); }
+.toast .ic { width: 18px; height: 18px; color: var(--accent); }
+.toast.leaving { opacity: 0; transition: opacity var(--t-slow); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---- заставка (components/Splash.jsx) ---- */
+/* Пока идёт заставка, экрана под ней нет: класс ставит index.html до первой отрисовки, снимает
+   заставка, когда начинает гаснуть, — отчёт проступает из-под неё, а не мелькает до неё. */
+.splashing #view { visibility: hidden; }
+.splash { position: fixed; inset: 0; z-index: 100; background: var(--bg); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.splash::before { content: ""; position: absolute; inset: 0; background: radial-gradient(closest-side at 50% 46%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); pointer-events: none; }
+.splash .inner { position: relative; display: flex; flex-direction: column; align-items: center; }
+.splash.leaving { animation: splash-out var(--t-slow) ease-in forwards; }
+.splash.leaving.fast { animation-duration: var(--t-fast); }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; transform: scale(1.02); } }
+.splash .mark-wrap { position: relative; width: 152px; height: 152px; }
+.splash .mark-wrap svg { width: 100%; height: 100%; position: relative; }
+.splash .mark-wrap .beam { position: absolute; width: 64%; height: 64%; margin: -32% 0 0 -32%; border-radius: 50%; background: conic-gradient(from 0deg, var(--accent), transparent 70deg, transparent 360deg); opacity: 0; }
+.splash .mark-wrap .ping { position: absolute; width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--accent); opacity: 0; transform: translate(-50%, -50%) scale(1); }
+.splash .word { margin-top: var(--sp-6); text-align: center; opacity: 0; transform: translateY(8px); }
+.splash .word .wm { font-size: 40px; }
+.splash .word small { display: block; margin-top: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); font-weight: 500; font-stretch: var(--narrow); opacity: 0; }
+/* сюжет: кольца мишени прорисовываются, пеликан прорисовывается в нырке и входит клювом в центр, блип вспыхивает */
+.splash.play .ring-a, .splash.play .ring-b, .splash.play .ring-c, .splash.play .bird { stroke-dasharray: 100; stroke-dashoffset: 100; }
+.splash.still .word, .splash.still .word small { opacity: 1; transform: none; }
+.splash.play .ring-c { animation: draw 380ms ease-out forwards; }
+.splash.play .ring-b { animation: draw 380ms ease-out 90ms forwards; }
+.splash.play .ring-a { animation: draw 380ms ease-out 180ms forwards; }
+.splash.play .ticks, .splash.play .pool { opacity: 0; animation: fade 380ms ease-out 180ms forwards; }
+.splash.play .drops { opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; transform: scale(.4); animation: splash-drops 420ms cubic-bezier(.2,1.4,.4,1) 1220ms forwards; }
+@keyframes splash-drops { to { opacity: 1; transform: none; } }
+.splash.short .drops { animation-delay: 700ms; }
+.splash.play .bird { animation: draw 760ms cubic-bezier(.4,0,.2,1) 230ms forwards; }
+.splash.play .dive { transform: translate(var(--dx), var(--dy)); animation: dive 990ms cubic-bezier(.55,0,.75,.2) 230ms forwards; }
+.splash.play .eye-dot { opacity: 0; animation: fade 200ms ease-out 760ms forwards; }
+.splash.play .beam { animation: beam 990ms linear 230ms forwards; }
+.splash.play .hit { transform-origin: center; transform-box: fill-box; transform: scale(0); animation: pop 380ms cubic-bezier(.2,1.4,.4,1) 1220ms forwards; }
+.splash.play .ping { animation: ping 610ms ease-out 1220ms forwards; }
+.splash.play .word { animation: rise 610ms var(--ease) 1600ms forwards; }
+.splash.play .word small { animation: fade 380ms ease-out 1970ms forwards; }
+/* короткий вариант по прямой ссылке на отчёт или ожидание — 987 мс, без словесного знака */
+.splash.short .ring-a, .splash.short .ring-b, .splash.short .ring-c { animation-duration: 230ms; }
+.splash.short .bird { animation-duration: 500ms; animation-delay: 90ms; }
+.splash.short .dive, .splash.short .beam { animation-duration: 610ms; animation-delay: 90ms; }
+.splash.short .hit, .splash.short .ping { animation-delay: 700ms; }
+.splash.short .word { display: none; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes dive { to { transform: none; } }
+@keyframes beam { 0% { opacity: .5; transform: rotate(0deg); } 80% { opacity: .5; } 100% { opacity: 0; transform: rotate(360deg); } }
+@keyframes pop { to { transform: scale(1); } }
+@keyframes ping { 0% { opacity: .9; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(7); } }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@keyframes fade { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .splash .word, .splash .word small { opacity: 1 !important; transform: none !important; }
+  .splash .hit, .splash .dive { transform: none !important; } .splash .eye-dot, .splash .ticks, .splash .pool, .splash .drops { opacity: 1 !important; transform: none !important; }
+  .splash .bird, .splash .ring-a, .splash .ring-b, .splash .ring-c { stroke-dashoffset: 0 !important; }
+}
+
+/* ---- радар (shared/radar.js): пояса — стадии, центр — раннее внедрение, край — концепция;
+   сектора — направления запроса; за кругом — снятое. Классы одни для экрана и печати (toSVG). ---- */
+.radar { position: relative; width: 100%; max-width: 780px; aspect-ratio: 148 / 104; margin: 0 auto; }
+.radar > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.radar-svg { overflow: visible; }
+.radar-svg .outer { fill: none; stroke: var(--line-2); stroke-width: .28; stroke-dasharray: .5 1.1; }
+.radar-svg .band { stroke: var(--surface); stroke-width: .35; }
+.radar-svg .band.b3 { stroke: var(--line-2); stroke-width: .3; }
+.radar-svg .b0 { fill: var(--band-0); } .radar-svg .b1 { fill: var(--band-1); } .radar-svg .b2 { fill: var(--band-2); } .radar-svg .b3 { fill: var(--band-3); }
+.radar-svg .wedge { fill: var(--accent); opacity: 0; transition: opacity var(--t-mid); pointer-events: none; }
+.radar-svg .wedge.on { opacity: .22; }
+.radar-svg .spoke { stroke: var(--surface); stroke-width: .35; }
+.radar-svg .rl { font-family: var(--sans); font-stretch: var(--narrow); font-weight: 600; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke-width: .7px; stroke-linejoin: round; pointer-events: none; }
+.radar-svg .rl.c { stroke: var(--band-0); fill: var(--ink-2); } .radar-svg .rl.l1 { stroke: var(--band-1); } .radar-svg .rl.l2 { stroke: var(--band-2); } .radar-svg .rl.l3 { stroke: var(--band-3); } .radar-svg .rl.o { stroke: var(--surface); }
+.radar-svg .fl { font-family: var(--sans); font-weight: 500; fill: var(--ink-2); cursor: pointer; transition: fill var(--t-fast); }
+.radar-svg .fl:hover, .radar-svg .fl.on { fill: var(--ink); }
+.radar-svg .fl.on { text-decoration: underline; text-decoration-color: var(--accent-2); }
+.radar-svg .flt { font-weight: 700; fill: var(--muted); }
+.radar-svg .fl.on .flt { fill: var(--accent-2); }
+.radar-svg .fk { display: none; font-family: var(--sans); font-weight: 700; fill: var(--ink-2); text-anchor: middle; cursor: pointer; }
+.radar-svg .fk.on { fill: var(--ink); }
+.radar.narrow .fl, .radar.narrow .rl { display: none; }
+/* узко: вместо подписей секторов — буквы; поля под подписи не нужны — радар шире контейнера на них */
+.radar.narrow { width: 142.3%; max-width: none; margin-left: -21.15%; }
+/* широко подписи секторов могут чуть выйти за коробку радара в поле поверхности; узко радар шире контейнера — обрезаем */
+.radarbox:has(> .radar.narrow) { overflow-x: clip; }
+.radar.narrow .fk { display: inline; }
+.radar .layer-dots { position: absolute; inset: 0; pointer-events: none; }
+.radar .sweep { position: absolute; left: 21.62%; top: 9.615%; width: 56.76%; height: 80.77%; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0deg 250deg, color-mix(in srgb, var(--accent) 55%, transparent) 357deg, var(--accent) 359.5deg, transparent 360deg);
+  opacity: .55; }
+/* Оборот — только по событию прогона (`Radar.turn`), не постоянно (NFR-10). */
+.radar .sweep.turn { animation: sweep 1.6s var(--ease) 1; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .radar .sweep, .radar .sweep.turn { animation: none; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 18%, transparent), transparent); opacity: 1; } }
+.radar .dot { position: absolute; transform: translate(-50%, -50%); width: 13px; height: 13px; padding: 0; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--surface); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; font: 600 11px/1 var(--sans); font-variant-numeric: tabular-nums; cursor: pointer; pointer-events: auto;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .18);
+  transition: left var(--t-slow) var(--ease), top var(--t-slow) var(--ease), width var(--t-mid), height var(--t-mid), background var(--t-mid), opacity var(--t-mid), box-shadow var(--t-fast); }
+.radar .dot.hi { background: var(--accent); color: var(--accent-ink); }
+.radar .dot.mid, .radar .dot.new { background: var(--accent-soft); }
+.radar .dot.thin { background: transparent; border-style: dashed; border-width: 1px; box-shadow: none; }
+.radar .dot.out { background: var(--cut); border-color: transparent; box-shadow: none; }
+.radar .dot.pool { width: 5px; height: 5px; background: var(--line-2); border-color: transparent; box-shadow: none; pointer-events: none; }
+.radar .dot:hover, .radar .dot.hot { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent-2); z-index: 3; }
+.radar .dot.sel { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5.5px var(--ink); z-index: 4; }
+.radar .dot.out.sel { border: 1.5px solid var(--ink); }
+.radar .dot.dim { opacity: .14; }
+.radar .dot:focus-visible { outline: 2px solid var(--focus); outline-offset: 5px; }
+.radar .dot.arrive { animation: arrive 700ms var(--ease); }
+@keyframes arrive { from { box-shadow: 0 0 0 0 var(--accent); } to { box-shadow: 0 0 0 16px transparent; } }
+.radar .name { position: absolute; font-size: var(--fs-sm); line-height: 1.3; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 8px; white-space: nowrap; pointer-events: none; z-index: 5; box-shadow: var(--sh-2); }
+.radar .tip { position: absolute; z-index: 6; width: max-content; max-width: 260px; padding: var(--sp-3) 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--sh-3); pointer-events: none; font-size: var(--fs-sm); line-height: 1.45; animation: tip-in var(--t-fast) var(--ease); }
+.radar .tip b { display: block; font-size: var(--fs-base); font-weight: 600; line-height: 1.3; }
+.radar .tip .m { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.radar .tip .f { display: inline-flex; margin-top: 6px; padding: 2px 8px; border-radius: var(--r-full); background: var(--surface-2); border: 1px solid var(--line); font-size: var(--fs-xs); color: var(--ink-2); }
+.radar .tip .w { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 6px; color: var(--ink-2); }
+@keyframes tip-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+/* легенда радара: группы в строку, образцы настоящие */
+.radar-key { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, auto)); justify-content: space-between; gap: var(--sp-3) var(--sp-6); margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--ink-2); }
+.radar-key .grp { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px var(--sp-3); }
+.radar-key .grp:first-child { max-width: 300px; }
+.radar-key .h { color: var(--muted); width: 100%; font-weight: 500; }
+.radar-key .it { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.radar-key i { display: inline-block; flex: none; }
+.radar-key .sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line-2); }
+.radar-key .sw.b0 { background: var(--band-0); } .radar-key .sw.b1 { background: var(--band-1); } .radar-key .sw.b2 { background: var(--band-2); } .radar-key .sw.b3 { background: var(--band-3); }
+.radar-key .dk { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--surface); }
+.radar-key .dk.s2 { width: 16px; height: 16px; } .radar-key .dk.s3 { width: 20px; height: 20px; }
+.radar-key .dk.hi { background: var(--accent); } .radar-key .dk.mid { background: var(--accent-soft); }
+.radar-key .dk.thin { background: transparent; border-style: dashed; border-width: 1px; }
+.radar-key .dk.out { width: 6px; height: 6px; background: var(--cut); border-color: transparent; }
+.radar-key .letters { display: none; }
+.radar-key.narrow .letters { display: flex; }
+.radar-key b.lt { display: inline-grid; }
+
+/* ---- карточка сигнала (shared/card.js) ---- */
+.card { padding: var(--sp-4) 0; }
+.card header { padding-bottom: var(--sp-4); }
+.card header .lab { margin-top: 6px; }
+.card header .row { margin-top: var(--sp-3); gap: 6px; }
+.card header .chip { height: 24px; font-size: var(--fs-xs); padding: 0 10px; }
+.card section { padding: var(--sp-4) 0; border-top: 1px solid var(--line); }
+.card h3 { color: var(--muted); margin-bottom: 6px; }
+.card p { line-height: 1.6; text-wrap: pretty; }
+.card blockquote { margin: var(--sp-3) 0 0; padding: var(--sp-2) var(--sp-3); border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--r-sm) var(--r-sm) 0; color: var(--ink-2); font-size: var(--fs-ui); }
+.card .facts li { display: grid; grid-template-columns: 84px 1fr; gap: var(--sp-2); padding: 5px 0; font-size: var(--fs-sm); line-height: 1.45; }
+.card .assess li { padding: 5px 0; font-size: var(--fs-sm); line-height: 1.45; }
+.card .assess + p { margin-top: var(--sp-2); }
+.card .facts time { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.card .srcs td { font-size: var(--fs-sm); height: auto; padding: 6px var(--sp-2) 6px 0; line-height: 1.4; vertical-align: top; }
+.card .srcs th { padding-left: 0; height: 32px; }
+.card .srcs .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.card .srcs .pub { color: var(--muted); font-size: var(--fs-xs); }
+.card .conf { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: var(--sp-3); }
+.card .conf .mono { text-align: right; font-size: var(--fs-xl); }
+.card .conf .bar { height: 8px; }
+.card .preds li { font-size: var(--fs-sm); line-height: 1.45; padding: 2px 0; color: var(--ink-2); }
+.card .preds li::before { content: "– "; color: var(--muted); }
+.card .chips .chip.solid { height: 26px; }
+/* свёрнутые разделы карточки */
+.card .fold { padding: 0; }
+.card .fold summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 48px; cursor: pointer; list-style: none; border-radius: var(--r-xs); }
+.card .fold summary::-webkit-details-marker { display: none; }
+.card .fold summary h3 { margin: 0; flex: 1; transition: color var(--t-fast); }
+.card .fold summary:hover h3 { color: var(--ink); }
+.card .fold summary .cnt { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.card .fold summary .ic { width: 16px; height: 16px; color: var(--muted); transition: transform var(--t-mid) var(--ease); }
+.card .fold details[open] summary .ic { transform: rotate(180deg); }
+.card .fold details > :not(summary) { margin-bottom: var(--sp-4); }
+/* источники списком */
+.srclist li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--sp-2); padding: var(--sp-2) 0; border-top: 1px solid var(--line); font-size: var(--fs-sm); line-height: 1.45; }
+.srclist li:first-child { border-top: 0; }
+.srclist .n { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.srclist a { font-weight: 500; overflow-wrap: anywhere; }
+.srclist .pub { margin-top: 2px; color: var(--muted); font-size: var(--fs-xs); }
+.srclist .sum { margin-top: 4px; color: var(--ink-2); }
+/* Ссылка [n] в тексте карточки (components/Cited.jsx) и подсветка источника, к которому она ведёт. */
+.refs { white-space: nowrap; }
+.ref { color: var(--ref); font-weight: 600; text-decoration: none; font-variant-numeric: tabular-nums; border-radius: 3px; padding: 0 1px; }
+.ref:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ref:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+[data-src].flash { animation: src-flash 1.6s var(--ease); }
+@keyframes src-flash { 0%, 35% { background: color-mix(in srgb, var(--accent) 32%, transparent); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { [data-src].flash { animation: none; outline: 2px solid var(--accent); } }

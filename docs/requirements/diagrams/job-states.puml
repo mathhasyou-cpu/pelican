@@ -1,0 +1,51 @@
+@startuml job-states
+' Состояния задания очереди (таблица jobs). Источник: src/pelican/jobs.py, api.py (Worker).
+skinparam shadowing false
+
+[*] --> queued : POST /api/ask\n(jobs.enqueue; тот же активный запрос → присоединение,\n> 3 активных с IP → 429, без вставки)
+
+queued --> running : jobs.claim()\nодин исполнитель, FOR UPDATE SKIP LOCKED\nstarted = touched = now()
+
+running --> running : say() / emit()\ntouched = now()
+
+running --> done : runner вернул отчёт\njobs.save_report + jobs.finish\nemit done {report}
+
+running --> failed : исключение или SystemExit\njobs.fail(error, error_detail)\nemit failed {error, error_detail}
+
+running --> failed : сторож (каждые 60 с):\nCOALESCE(touched, started) старше\nSTUCK_RUNS × typical_run_s\n"прогресс не двигался N с — задание снято сторожем"
+
+running --> queued : старт процесса API:\njobs.requeue_stale()\nсобытия удалены, progress = [],\nstarted = NULL
+
+queued --> cancelled : POST /api/jobs/{id}/cancel\nс адреса-автора (иначе 403)
+
+running --> running : cancel с адреса-автора:\nфлаг jobs.cancel = true
+
+running --> cancelled : граница стадии при cancel = true\n(emit stage → jobs.Cancelled; save не прерывается);\nили requeue_stale на старте API
+
+done --> [*]
+failed --> [*]
+cancelled --> [*]
+
+note right of done
+  События done/failed-заданий,
+  кроме последних 20 готовых,
+  удаляет сторож (prune_events).
+  События cancelled не удаляются —
+  расходится с BR-47 (07 §8.6).
+  Отчёт остаётся в reports навсегда.
+end note
+
+note left of queued
+  position = ожидающих впереди (+1 за идущий)
+  eta_start_s = остаток идущего
+    + typical_run_s × ожидающих впереди
+end note
+
+note bottom of queued
+  Прототип (BR-57, BR-58; в коде стенда отсутствует):
+  планировщик тем ставит задание напрямую
+  через jobs.enqueue (client topic:<id>),
+  минуя api.ask и кэш повтора; статья —
+  задание kind='article' после прогона.
+end note
+@enduml

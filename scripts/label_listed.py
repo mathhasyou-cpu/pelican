@@ -39,6 +39,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from pelican import locks  # noqa: E402
+from pelican.runner import MODEL_LOCK  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("judge_match", REPO / "scripts" / "judge_match.py")
 judge_match = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(judge_match)
@@ -246,4 +249,10 @@ def rankings(folder: Path, shuffles: int = 50) -> dict[str, float]:
 
 
 if __name__ == "__main__":
-    main()
+    # Модель одна на стенд (NFR-26): исполнитель API держит тот же замок — «занято» = код 75.
+    try:
+        with locks.hold(MODEL_LOCK):
+            main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

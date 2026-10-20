@@ -62,8 +62,14 @@ def too_late(published: str) -> bool:
     """Свидетельство из будущего относительно среза: в прогон оно не идёт."""
     if AS_OF is None or not published:
         return False
+    raw = published.strip()
+    # ⚠️ Дата-год («2019», КиберЛенинка) — отдельная ветка: `fromisoformat` её не берёт, и
+    # без этого документ 2025 года проходил под срезом 2020 как «дату не разобрали».
+    # Год среза считается «не позже»: выбрасывается только год строго после среза.
+    if len(raw) == 4 and raw.isdigit():
+        return int(raw) > AS_OF.year
     try:
-        return date.fromisoformat(published[:10]) > AS_OF
+        return date.fromisoformat(raw[:10]) > AS_OF
     except ValueError:
         # Дату не разобрали — свидетельство остаётся: выбрасывать по догадке нельзя.
         return False

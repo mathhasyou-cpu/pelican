@@ -1,0 +1,73 @@
+{
+ "studies": [
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT06227065",
+     "briefTitle": "Precise Chemoresection in Low-grade NMIBC Using Drug Screens in Patient-derived Organoids"
+    },
+    "statusModule": {
+     "overallStatus": "NOT_YET_RECRUITING",
+     "startDateStruct": {
+      "date": "2026-12-01"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "Hospital Centre Biel/Bienne"
+     }
+    },
+    "designModule": {
+     "phases": [
+      "PHASE2"
+     ]
+    }
+   }
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT06479837",
+     "briefTitle": "Modeling Host-Pathogen Interaction Using Lymphoid Organoids"
+    },
+    "statusModule": {
+     "overallStatus": "RECRUITING",
+     "startDateStruct": {
+      "date": "2026-10-20"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "National Institute of Allergy and Infectious Diseases (NIAID)"
+     }
+    },
+    "designModule": {}
+   }
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT07828665",
+     "briefTitle": "Development of a Duodenal Organoid Model for Host-Intestinal Pathogen Interaction Studies"
+    },
+    "statusModule": {
+     "overallStatus": "RECRUITING",
+     "startDateStruct": {
+      "date": "2026-06-09"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "IRCCS Sacro Cuore Don Calabria di Negrar"
+     }
+    },
+    "designModule": {
+     "phases": [
+      "NA"
+     ]
+    }
+   }
+  }
+ ],
+ "nextPageToken": "ZVNj7o2Elu8o3lpzBdv-p-numpOQJJxuYvml1fIZnj6SuP08FCfCF_LX8tZL0SI"
+}

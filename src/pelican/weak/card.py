@@ -13,10 +13,14 @@
 потенциалом для трансформации» для него — потерянное время. Промпт требует в каждом
 предложении проверяемый факт (дату, число, названную организацию или работу) — приём
 entity-dense summary, Chain of Density (Adams и др. 2023, arXiv:2309.15217) в одношаговой
-форме, — а `parse` проверяет это буквой по ПРЕДЛОЖЕНИЯМ: в «Преимуществе» и «Кейсе»
-предложение без якоря вычищается, а число, которого нет в процитированных
-свидетельствах, вычищает предложение в любом разделе. Хронология `facts` — пункт без
-даты или без ссылки отбрасывается.
+форме. `parse` проверяет буквой по ПРЕДЛОЖЕНИЯМ то, что буквой проверить можно: ссылку
+на свидетельство и число, которого нет в процитированных свидетельствах, — такое
+предложение вычищается в любом разделе. Хронология `facts` — пункт без даты или без
+ссылки отбрасывается.
+⚠️ Не возвращать проверку «якоря» (цифра или латинское имя) в «Преимущество» и «Кейс»:
+на 30 карточках она сняла 12 предложений, из них 10 — конкретные, с русскими терминами
+и аббревиатурами («ХОБЛ», «AMPA»), и оставила пустым «Преимущество» у 12 из 30, а ТЗ
+требует его у каждого сигнала (`scripts/measure_card_drops.py`, docs/weak-card.md).
 
 ⚠️ **Резюме иностранного источника помечается как машинное.** ТЗ: «при использовании
 автоматического перевода или генеративного резюме это должно быть отмечено возле
@@ -32,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pelican.weak.assess import Evidence
+from pelican.weak.textcheck import quote_appears_in
 
 #: Свидетельство в промпте карточки: заголовок + аннотация/сниппет (`weak.deepen`).
 #: ⚠️ Догадка (docs/todo.md); у оценки зрелости своя длина — `EVIDENCE_CHARS`.
@@ -42,13 +47,6 @@ _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 #: Число с разделителями разрядов: «1,7», «1.7», «570», «12 000».
 _NUMBER = re.compile(r"\d[\d.,  ]*\d|\d")
 _NOT_DIGIT = re.compile(r"[^\d]")
-#: Латинское имя собственное: компания, продукт, модель, издатель.
-_NAME = re.compile(r"\b[A-Z][A-Za-z0-9]*[a-z0-9][A-Za-z0-9-]*\b|\b[A-Z]{2,}[0-9]+\b")
-#: Термины, которые пишутся с заглавной, но фактом не являются.
-_GENERIC = frozenset(
-    "AI LLM LLMs ML MoE UI API GPU CPU NPU Transformer Transformers Attention Agent Agents "
-    "Generative Quantum Machine Learning Large Language Model Models World Deep Neural".split()
-)
 
 SYSTEM_PROMPT = """You write an analyst card in RUSSIAN about one emerging TECHNOLOGY,
 using ONLY the numbered EVIDENCE. The reader is a specialist: a sentence that is true
@@ -78,7 +76,13 @@ summaries    — for EACH evidence item you cited: its number and one Russian se
 hypothesis   — ONE Russian sentence for the analyst to verify next: "Если <condition
                that the evidence shows is starting>, то <what to expect within 1-2
                years and for whom>". Build it only on facts from the evidence, cite the
-               items it rests on; no numbers that are not in them."""
+               items it rests on; no numbers that are not in them.
+why          — 1 or 2 Russian sentences: why this is a WEAK SIGNAL — still small, but
+               already confirmed — and not an established trend or a lone idea. Name what
+               is new (the specific technique) and what confirms it independently (another
+               group, a patent, a pilot, a company), with citations.
+why_quote    — a short fragment, 20 to 160 characters, copied WORD FOR WORD from ONE
+               cited item, that best supports "why". Copy, do not paraphrase or translate."""
 
 
 @dataclass(slots=True)
@@ -93,6 +97,13 @@ class Card:
     #: «Сигнал найден → генерация гипотезы» (схема 1 ТЗ): проверяемое «если…, то…» для
     #: эксперта. Проходит ту же чистку, что описание: без ссылки или с выдуманным числом — пусто.
     hypothesis: str = ""
+    #: «Почему это слабый сигнал» — по свидетельствам, с ссылками, той же чисткой, что
+    #: описание. Пишется карточкой, потому что объяснение оценки зрелости (`assess.parse`)
+    #: без ссылки выбрасывается целиком — на стенде так пустело 5–8 карточек из 12–15.
+    why: str = ""
+    #: Дословный фрагмент свидетельства в опору `why`; пусто — не найден в тексте
+    #: (`textcheck.quote_appears_in`, проверка атрибуции ALCE).
+    why_quote: str = ""
 
 
 def schema() -> dict[str, Any]:
@@ -104,6 +115,8 @@ def schema() -> dict[str, Any]:
             "advantage": {"type": "string"},
             "case": {"type": "string"},
             "hypothesis": {"type": "string"},
+            "why": {"type": "string"},
+            "why_quote": {"type": "string"},
             "facts": {
                 "type": "array",
                 "maxItems": 6,
@@ -125,7 +138,8 @@ def schema() -> dict[str, Any]:
             },
         },
         "required": [
-            "title", "description", "advantage", "case", "facts", "summaries", "hypothesis"
+            "title", "description", "advantage", "case", "facts", "summaries", "hypothesis",
+            "why", "why_quote",
         ],
         "additionalProperties": False,
     }
@@ -174,6 +188,12 @@ def foreign_script(text: str) -> bool:
     )
 
 
+def has_cyrillic(text: str) -> bool:
+    """Русское ли название: латиница тоже «своё» письмо (`_SCRIPTS`), и английский
+    «перевод» иначе проходил бы за русский (NFR-01, PQA-004)."""
+    return any(unicodedata.name(ch, "").startswith("CYRILLIC") for ch in text if ch.isalpha())
+
+
 def drop_foreign(text: str) -> str:
     """Текст без предложений с чужим письмом (`foreign_script`) — для полей, которые не
     проходят `_clean`: объяснения оценки и тематичности, поля отчётов, собранных до проверки."""
@@ -198,24 +218,9 @@ def invented_numbers(sentence: str, cited: list[str]) -> list[str]:
     return out
 
 
-def has_anchor(sentence: str, name: str, companies: list[str]) -> bool:
-    """Есть ли в предложении проверяемый якорь: число, дата или имя собственное.
-
-    Латинское слово с заглавной — имя, если это не общий термин и не слово самого
-    названия технологии («World Models» в карточке о world models — не факт).
-    """
-    body = _REF.sub(" ", sentence)
-    if re.search(r"\d", body) or any(c and c in body for c in companies):
-        return True
-    own = {w.lower() for w in re.findall(r"[A-Za-z]+", name)}
-    return any(w not in _GENERIC and w.lower() not in own for w in _NAME.findall(body))
-
-
-def _clean(
-    text: str, texts: list[str], name: str, companies: list[str], anchored: bool
-) -> str:
-    """Оставить только предложения со ссылкой на существующее свидетельство, без
-    выдуманных чисел и — где `anchored` — с якорем. См. докстринг модуля."""
+def _clean(text: str, texts: list[str]) -> str:
+    """Оставить только предложения со ссылкой на существующее свидетельство и без
+    выдуманных чисел. См. докстринг модуля."""
     kept = []
     for s in sentences(text):
         nums = [r for r in refs(s) if 1 <= r <= len(texts)]
@@ -223,18 +228,13 @@ def _clean(
             continue
         if invented_numbers(s, [texts[r - 1] for r in nums]):
             continue
-        if anchored and not has_anchor(s, name, companies):
-            continue
         kept.append(s)
     return " ".join(kept)
 
 
-def parse(
-    payload: dict[str, Any], name: str, evidence: list[Evidence], companies: list[str] = ()
-) -> Card:
+def parse(payload: dict[str, Any], name: str, evidence: list[Evidence]) -> Card:
     n = len(evidence)
     texts = [evidence_line(ev) for ev in evidence]
-    companies = list(companies)
     summaries = {}
     for item in payload.get("summaries") or []:
         k = int(item.get("n") or 0)
@@ -248,23 +248,37 @@ def parse(
         if not re.fullmatch(r"(19|20)\d\d(-[01]\d(-[0-3]\d)?)?", day):
             continue
         day = day[:7]
-        text = _clean(str(item.get("text") or ""), texts, name, companies, False)
+        text = _clean(str(item.get("text") or ""), texts)
         # Дата пункта — тоже число: она обязана стоять в процитированном свидетельстве.
         cited = [texts[r - 1] for r in refs(text) if 1 <= r <= n]
         if text and digits(day) in digits(" ".join(cited)):
             facts.append((day, text))
     title = " ".join(str(payload.get("title") or "").split())
-    if not title or foreign_script(title):
+    if not title or foreign_script(title) or not has_cyrillic(title):
         title = name
+    why = _clean(str(payload.get("why") or ""), texts)
     return Card(
         title=title,
-        description=_clean(str(payload.get("description") or ""), texts, name, companies, False),
-        advantage=_clean(str(payload.get("advantage") or ""), texts, name, companies, True),
-        case=_clean(str(payload.get("case") or ""), texts, name, companies, True),
+        description=_clean(str(payload.get("description") or ""), texts),
+        advantage=_clean(str(payload.get("advantage") or ""), texts),
+        case=_clean(str(payload.get("case") or ""), texts),
         summaries=summaries,
         facts=sorted(facts),
         hypothesis=_whole(str(payload.get("hypothesis") or ""), texts),
+        why=why,
+        why_quote=verified_quote(str(payload.get("why_quote") or ""), why, texts),
     )
+
+
+def verified_quote(quote: str, why: str, texts: list[str]) -> str:
+    """Цитата в опору объяснения — только если она дословно стоит в одном из
+    свидетельств, на которые объяснение ссылается (`textcheck`, приём ALCE). Нет такого
+    свидетельства или фраза не найдена — пусто: цитата не чинится, а не показывается."""
+    quote = " ".join(quote.split())
+    cited = [texts[r - 1] for r in refs(why) if 1 <= r <= len(texts)]
+    if not quote or not cited or foreign_script(quote):
+        return ""
+    return quote if any(quote_appears_in(quote, t) for t in cited) else ""
 
 
 def _whole(text: str, texts: list[str]) -> str:

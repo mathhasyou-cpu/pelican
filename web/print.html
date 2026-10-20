@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>АС ПЕЛИКАН, отчёт для печати</title>
+<meta name="description" content="Печатный отчёт АС ПЕЛИКАН: титул, радар, топ, карточка каждого сигнала, исключённое и методика. Формат A4, сохраняется в PDF через печать браузера.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wdth,wght@12..36,75..150,300..900&display=swap" rel="stylesheet">
+<script>
+  /* Оформление то же, что у продукта: ?brand=gpb|pelican, иначе запомненное. */
+  (function () {
+    var m = /[?&]brand=(gpb|pelican)/.exec(location.search), b = m ? m[1] : null;
+    try { if (!b) b = localStorage.getItem("pelican-brand"); } catch (e) { /* приватное окно */ }
+    if (b === "gpb") document.documentElement.setAttribute("data-brand", "gpb");
+  })();
+</script>
+</head>
+<body class="doc">
+<div id="root"></div>
+<script type="module" src="/src/print/main.jsx"></script>
+</body>
+</html>

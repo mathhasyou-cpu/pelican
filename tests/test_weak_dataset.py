@@ -40,6 +40,20 @@ def _doc(title: str, url: str, published: str, publisher: str) -> LiveDoc:
     return LiveDoc("google_news", title, url, published, publisher, "en", domain=publisher)
 
 
+def test_issue_arm_has_the_composition_of_the_live_prompt() -> None:
+    """Плечо `issue` — ровно состав выдачи: 5 новостей + 2 работы + след (PEL-E-05)."""
+    from pelican.weak import ask
+    from pelican.weak.dataset import ISSUE_ARM, ISSUE_NEWS, ISSUE_PAPERS, Row, candidate
+
+    assert (ISSUE_NEWS, ISSUE_PAPERS) == (ask.NEWS_PER_CARD, ask.PAPERS_PER_CARD)
+    row = Row("pos", "1", "x")
+    row.news = [LiveDoc("google_news", f"h{i}", "u", "2026-01-01", "P", "en") for i in range(8)]
+    row.papers = [Evidence(i, "2026-01-01", f"p{i}", PAPER) for i in range(4)]
+    row.core_print = row.label_print = Footprint("x", 10, 2020, 2)
+    kinds = [e.kind for e in candidate(row, ISSUE_ARM).evidence]
+    assert kinds == [NEWS] * 5 + [PAPER] * 2 + [CORPUS]
+
+
 def test_feature_names_are_stable_and_labelled() -> None:
     sets = (FEATURE_NAMES, LLM_FEATURES, JUDGMENT_FEATURES, EMBED_FEATURES)
     everything = [n for names in sets for n in names]

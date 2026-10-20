@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import io as _io
 import json
 import math
 import shutil
@@ -62,7 +61,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from sklearn.base import clone  # noqa: E402
 from sklearn.impute import SimpleImputer  # noqa: E402
@@ -178,7 +177,10 @@ def cross_validate(est: object, grid: dict, x: np.ndarray, y: np.ndarray) -> dic
         }
         for k in keys
     }
-    return {"summary": summary, "pooled": pooled, "oof_margin": oof_margin.mean(axis=0)}
+    # ⚠️ Отступы каждого повтора — отдельные наблюдения, а не среднее: усреднение по повторам
+    # сужает разброс, и сигмоида Платта на нём круче, чем на отступах одной модели, к
+    # которой её применяют (PEL-G-07). Плоский массив `REPEATS × n` идёт с `np.tile(y)`.
+    return {"summary": summary, "pooled": pooled, "oof_margin": oof_margin.ravel()}
 
 
 def platt(margin: np.ndarray, y: np.ndarray) -> tuple[float, float]:
@@ -294,7 +296,12 @@ def main() -> None:
     rows = read_tsv(Path(args.features))
     seen = {(r["set"], r["n"]) for r in rows}
     for extra in args.extra:
-        for r in read_tsv(Path(extra)):
+        more = read_tsv(Path(extra))
+        if not more:
+            # ⚠️ Пустой `--extra` молча добавлял 0 строк, и отчёт подписывал модель как
+            # обученную с трудным контролем (PEL-G-08).
+            raise SystemExit(f"{extra}: ни одной строки — трудного контроля нет")
+        for r in more:
             if (r["set"], r["n"]) not in seen:
                 rows.append(r)
                 seen.add((r["set"], r["n"]))
@@ -374,12 +381,13 @@ def main() -> None:
     x = matrix(rows, tuple(names))
     final = zoo.fit_best(clone(est), grid, x, y)
     imp = importance(final, x, y, names)
-    a, b = platt(cv["oof_margin"], y)
+    y_oof = np.tile(y, REPEATS)
+    a, b = platt(cv["oof_margin"], y_oof)
     prob_cal = 1 / (1 + np.exp(-(a * cv["oof_margin"] + b)))
     prob_raw = 1 / (1 + np.exp(-cv["oof_margin"]))
-    brier_raw = brier_score_loss(y, prob_raw)
-    brier_cal = brier_score_loss(y, prob_cal)
-    table = reliability(prob_cal, y)
+    brier_raw = brier_score_loss(y_oof, prob_raw)
+    brier_cal = brier_score_loss(y_oof, prob_cal)
+    table = reliability(prob_cal, y_oof)
     s = cv["summary"]
     gate = (
         s["accuracy"]["mean"] >= GATE_ACC

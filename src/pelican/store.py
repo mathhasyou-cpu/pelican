@@ -13,9 +13,10 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import struct
 from collections.abc import Iterable, Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -106,8 +107,9 @@ class Store:
                 for row in rows:
                     copy.write_row(row)
             cur = self.conn.raw.execute(
-                "INSERT INTO works (id, source, term_raw, observed_at, url, field, junk) "
-                "SELECT DISTINCT ON (id) * FROM _w ON CONFLICT (id) DO NOTHING"
+                "INSERT INTO works (id, source, term_raw, observed_at, url, field, junk, "
+                "collected_at) SELECT DISTINCT ON (id) id, source, term_raw, observed_at, url, "
+                "field, junk, now() FROM _w ON CONFLICT (id) DO NOTHING"
             )
             return cur.rowcount
 
@@ -119,10 +121,9 @@ class Store:
         """
         from pelican.weak.corpus import is_junk
 
+        signals = self._new_arxiv_versions_only([s for s in signals if s.source in SCIENCE_SOURCES])
         rows = []
         for s in signals:
-            if s.source not in SCIENCE_SOURCES:
-                continue
             payload = s.payload or {}
             rows.append((
                 work_id(s.source, s.external_id, s.metric, s.observed_at),
@@ -135,10 +136,43 @@ class Store:
             ))
         return self.insert_works(rows)
 
+    def _new_arxiv_versions_only(self, signals: list[Any]) -> list[Any]:
+        """Без повторных версий препринта, который уже есть в корпусе или в этой пачке.
+
+        API arXiv отдаёт в `<id>` ТЕКУЩУЮ версию, а в `<published>` — дату v1. Суточный сбор
+        читает окно в трое суток: вчера препринт пришёл как `…v1`, сегодня как `…v2` с той
+        же датой и почти тем же текстом — другой `external_id`, другой id, вторая строка в
+        `works` и двойной счёт в следе самых свежих работ (PEL-J-02). Ключ работы при этом
+        не меняется (id — первичный ключ шардов и `tech_mentions`, совместим с родителем):
+        выживает строка, пришедшая первой. Поиск — по дате публикации, у версий она общая,
+        так что запрос идёт индексом `works_observed`, а не по 15 млн ссылок.
+        """
+        arxiv = [s for s in signals if s.source == "arxiv" and _arxiv_version(s.external_id)[1]]
+        if not arxiv:
+            return signals
+        days = sorted({_naive(s.observed_at) for s in arxiv})
+        have = {
+            _arxiv_version(r[0].rsplit("/abs/", 1)[-1])[0]
+            for r in self.conn.execute(
+                "SELECT url FROM works WHERE source = 'arxiv' AND observed_at = ANY(?)", [days]
+            ).fetchall()
+            if r[0]
+        }
+        out, taken = [], set()
+        # Младшая версия пачки — первой: из v1 и v2 одной пачки выживает v1.
+        for s in sorted(signals, key=lambda s: _arxiv_version(s.external_id)[1] if s.source == "arxiv" else 0):
+            if s.source == "arxiv":
+                base, _v = _arxiv_version(s.external_id)
+                if base in have or base in taken:
+                    continue
+                taken.add(base)
+            out.append(s)
+        return out
+
     def untagged_science(
         self,
         model: str,
-        since: datetime,
+        since: datetime | None,
         limit: int | None = None,
         ids: Sequence[int] | None = None,
     ) -> list[tuple[int, str]]:
@@ -147,7 +181,7 @@ class Store:
         Очередь — `LEFT JOIN tech_mentions` с проверкой на NULL: прерванный прогон
         продолжается с того же места, повторный не платит за сделанное. Строки без
         содержания (`works.junk`) в очередь не идут. `ids` сужает очередь до найденного
-        поиском (`ask`); горизонт `since` действует и тогда.
+        поиском (`ask`); `since` — горизонт по дате, `None` — без горизонта.
         """
         only = ""
         if ids is not None:
@@ -155,18 +189,20 @@ class Store:
             if not listed:
                 return []
             only = f"AND w.id IN ({listed})"
+        horizon = "AND w.observed_at >= ?" if since is not None else ""
+        params: list = [model] + ([_naive(since)] if since is not None else [])
         tail = f"LIMIT {int(limit)}" if limit is not None else ""
         return self.conn.execute(
             f"""
             SELECT w.id, w.term_raw
             FROM works w
             LEFT JOIN tech_mentions t ON t.signal_id = w.id AND t.model = ?
-            WHERE t.signal_id IS NULL AND NOT w.junk AND w.observed_at >= ?
+            WHERE t.signal_id IS NULL AND NOT w.junk {horizon}
               {only}
             ORDER BY w.observed_at DESC
             {tail}
             """,
-            [model, _naive(since)],
+            params,
         ).fetchall()
 
     def save_tech(self, model: str, rows: Sequence[tuple[int, str, str]]) -> None:
@@ -183,92 +219,13 @@ class Store:
                 [(sid, model, tech, role) for sid, tech, role in rows],
             )
 
-    def tech_counts(self, model: str) -> list[tuple[str, int]]:
-        return self.query(
-            "SELECT role, count(*) FROM tech_mentions WHERE model = ? GROUP BY 1 ORDER BY 2 DESC",
-            [model],
-        )
-
-    def distinct_techs(self, model: str) -> list[tuple[str, int, int, int]]:
-        """(приём, предлагают, применяют, обозревают).
-
-        Три счётчика врозь, а не одна сумма: `proposes` — новизна, `uses` — диффузия,
-        `reviews` — признак зрелости (Yoon 2012). Сложенные, они перестают различать
-        зарождающийся приём и доживающий.
-        """
-        return self.query(
-            """
-            SELECT tech,
-                   count(*) FILTER (WHERE role = 'proposes'),
-                   count(*) FILTER (WHERE role = 'uses'),
-                   count(*) FILTER (WHERE role = 'reviews')
-            FROM tech_mentions WHERE model = ? AND tech <> ''
-            GROUP BY tech ORDER BY tech
-            """,
-            [model],
-        )
-
-    def tech_daily_counts(self, model: str) -> list[tuple[str, str, date, int]]:
-        """(приём, источник, день, работ). 1 января выброшено: у openalex это заглушка
-        вместо даты, и детектор всплеска находил бы её первой на каждом годовом стыке."""
-        return self.query(
-            f"""
-            SELECT t.tech, w.source, w.observed_at::date AS day, count(*)
-            FROM tech_mentions t JOIN works w ON w.id = t.signal_id
-            WHERE t.model = ? AND t.tech <> '' AND NOT {_JAN1}
-            GROUP BY 1, 2, 3
-            """,
-            [model],
-        )
-
-    def tech_spans(self, model: str) -> dict[str, tuple[date, date]]:
-        """{приём: (первая работа, последняя работа)}, без заглушки 1 января."""
-        rows = self.query(
-            f"""
-            SELECT t.tech, min(w.observed_at::date), max(w.observed_at::date)
-            FROM tech_mentions t JOIN works w ON w.id = t.signal_id
-            WHERE t.model = ? AND t.tech <> '' AND NOT {_JAN1}
-            GROUP BY 1
-            """,
-            [model],
-        )
-        return {r[0]: (r[1], r[2]) for r in rows}
-
-    def replace_tech_groups(self, model: str, threshold: float, groups: Sequence[Any]) -> None:
-        """Заменить группы приёмов эмбеддера `model` целиком, одной транзакцией."""
-        with self.conn.raw.transaction(), self.conn.raw.cursor() as cur:
-            cur.execute(
-                "DELETE FROM tech_group_members WHERE group_id IN "
-                "(SELECT id FROM tech_groups WHERE model = %s)",
-                [model],
-            )
-            cur.execute("DELETE FROM tech_groups WHERE model = %s", [model])
-            if not groups:
-                return
-            base = cur.execute("SELECT coalesce(max(id), 0) + 1 FROM tech_groups").fetchone()[0]
-            cur.executemany(
-                "INSERT INTO tech_groups (id, label, model, threshold, proposes, uses, reviews,"
-                " first_seen, last_seen, created_at)"
-                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, now() AT TIME ZONE 'UTC')",
-                [
-                    (base + i, g.label, model, threshold, g.proposes, g.uses, g.reviews,
-                     g.first_seen, g.last_seen)
-                    for i, g in enumerate(groups)
-                ],
-            )
-            cur.executemany(
-                "INSERT INTO tech_group_members (group_id, tech, border) VALUES (%s, %s, %s)"
-                " ON CONFLICT DO NOTHING",
-                [
-                    (base + i, tech, border)
-                    for i, g in enumerate(groups)
-                    for tech, border in [*((t, False) for t in g.members),
-                                         *((t, True) for t in g.border)]
-                ],
-            )
+_VERSION = re.compile(r"^(.*)v(\d+)$")
 
 
-_JAN1 = "(extract(month FROM w.observed_at) = 1 AND extract(day FROM w.observed_at) = 1)"
+def _arxiv_version(external_id: str) -> tuple[str, int]:
+    """`2609.06873v2` → (`2609.06873`, 2); без версии — (id, 0)."""
+    m = _VERSION.match(external_id)
+    return (m.group(1), int(m.group(2))) if m else (external_id, 0)
 
 
 def _naive(value: datetime) -> datetime:

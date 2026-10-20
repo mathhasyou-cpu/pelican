@@ -28,6 +28,21 @@ def _isolate_files(tmp_path_factory: pytest.TempPathFactory):
     locks.LOCK_DIR, cache.DIR = was_locks, was_cache
 
 
+@pytest.fixture(autouse=True)
+def _google_breaker_closed():
+    """Предохранитель Google News (`live._trip`) не переносит отказ одного теста в другой."""
+    from pelican.config import settings
+    from pelican.weak import live
+
+    # ⚠️ Адрес Wi-Fi из `.env` дал бы Google News свой транспорт мимо подменённого в тесте —
+    # тесты пошли бы в настоящую сеть.
+    was, settings.news_local_address = settings.news_local_address, ""
+    live._block_file().unlink(missing_ok=True)
+    yield
+    live._block_file().unlink(missing_ok=True)
+    settings.news_local_address = was
+
+
 @pytest.fixture
 def store(pg_url):
     """Хранилище на тестовой базе: схема на месте, все таблицы пусты."""
@@ -36,7 +51,7 @@ def store(pg_url):
     s = Store(pg_url)
     s.init_schema()
     s.conn.execute(
-        "TRUNCATE works, tech_mentions, tech_groups, tech_group_members, jobs, reports"
+        "TRUNCATE works, tech_mentions, tech_groups, tech_group_members, jobs, job_events, reports"
     )
     yield s
     s.close()

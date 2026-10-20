@@ -18,16 +18,24 @@ log = logging.getLogger("pelican.runner")
 MODEL_LOCK = "model"
 
 
-def run_query(query: str, say: Callable[[str], None]) -> tuple[str, str, str]:
-    """Запрос → (имя отчёта, JSON результата, HTML страницы-отчёта)."""
+def run_query(
+    query: str,
+    say: Callable[[str], None],
+    emit: Callable[[str, dict], None] | None = None,
+) -> tuple[str, str, str]:
+    """Запрос → (имя отчёта, JSON результата, HTML страницы-отчёта).
+
+    `emit` — хук структурных событий для живого экрана ожидания; без него прогон прежний.
+    """
     from pelican.weak import history, page
     from pelican.weak.ask import run as run_ask
 
     started = datetime.now()
+    hooks = {"on_event": emit} if emit is not None else {}
     with locks.hold(MODEL_LOCK), Store(settings.database_url) as store:
-        result = run_ask(store, query, on_progress=say)
+        result = run_ask(store, query, on_progress=say, **hooks)
     with jobs.connect(settings.database_url) as conn:
-        past = [r["result"] for r in jobs.reports(conn, limit=500)]
+        past = jobs.history(conn, query)
     history.annotate(result, history.prior_runs(past, query, result.started))
     log.info(
         "ответ «%s»: %d сигналов, %d кандидатов, %d источников; модели: %s",

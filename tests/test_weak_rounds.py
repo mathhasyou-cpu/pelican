@@ -19,6 +19,10 @@ from pelican.weak.live import LiveDoc
         ("Seed round of $500K closed", 500e3),
         ("Company raises €30 million", None),
         ("AI chip firm raises funding, amount undisclosed", None),
+        # Запятая — разделитель тысяч, а не десятичная (PEL-H-08).
+        ("Lab raises $1,200 million for fabs", 1.2e9),
+        ("Seed round of $500,000 closed", 500e3),
+        ("Robot costs $5, startup raises $20M", 20e6),
     ],
 )
 def test_parse_usd(title: str, usd: float | None) -> None:
@@ -56,11 +60,11 @@ def test_trace_queries_templates_per_label_and_lifts_asof(monkeypatch) -> None:
         seen.update(queries=queries, window=window, limit=limit, asof=asof.AS_OF)
         return [[_doc(f"X{i} raises $1M", f"u{i}", "2025-01-01")] for i, _q in enumerate(queries)]
 
-    monkeypatch.setattr(rounds, "news_many", fake_news_many)
+    monkeypatch.setattr(rounds, "news_many_measured", fake_news_many)
     monkeypatch.setattr(asof, "AS_OF", date(2024, 9, 15))
     got = rounds.trace(["a", "b"], date(2024, 9, 15), date(2026, 9, 15))
     assert seen["asof"] is None  # срез снят на время запроса...
-    assert asof.AS_OF == date(2024, 9, 15)  # ...и возвращён
+    assert date(2024, 9, 15) == asof.AS_OF  # ...и возвращён
     assert seen["limit"] == rounds.LIMIT
     assert seen["window"] == "after:2024-09-15 before:2026-09-15"
     assert len(seen["queries"]) == 2 * len(rounds.TEMPLATES)
@@ -77,7 +81,7 @@ def test_features_take_two_year_windows_and_skip_prev_on_request(monkeypatch) ->
         windows.append(window)
         return [[_doc(f"Acme{i} raises $2M", f"u{i}{window}", "2025-06-01")] for i, _q in enumerate(queries)]  # noqa: E501
 
-    monkeypatch.setattr(rounds, "news_many", fake_news_many)
+    monkeypatch.setattr(rounds, "news_many_measured", fake_news_many)
     cut = date(2026, 9, 21)
     got = rounds.features(["a"], cut)
     assert windows == [

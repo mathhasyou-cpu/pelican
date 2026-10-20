@@ -1,0 +1,49 @@
+{
+ "meta": {
+  "search_id": "OzbocD8rh0yhZCt6_488IQ",
+  "total": 132,
+  "offset": 0,
+  "limit": 3,
+  "sort_field": "award_notice_date",
+  "sort_order": "desc",
+  "sorted_by_relevance": true,
+  "properties": {
+   "URL": "https:/reporter.nih.gov/search/OzbocD8rh0yhZCt6_488IQ/projects"
+  }
+ },
+ "results": [
+  {
+   "appl_id": 11371067,
+   "fiscal_year": 2026,
+   "project_num": "1K99HD119264-01A1",
+   "organization": {
+    "org_name": "PENNSYLVANIA STATE UNIV HERSHEY MED CTR"
+   },
+   "award_amount": 125187,
+   "award_notice_date": "2026-09-17T00:00:00",
+   "project_title": "Mechanisms of SARS-CoV-2-Mediated Disruption of Trophoblast Dynamics"
+  },
+  {
+   "appl_id": 11443222,
+   "fiscal_year": 2026,
+   "project_num": "1R21AG102460-01",
+   "organization": {
+    "org_name": "BOSTON CHILDREN'S HOSPITAL"
+   },
+   "award_amount": 500168,
+   "award_notice_date": "2026-09-07T00:00:00",
+   "project_title": "A Human Bladder Mucosa–Muscle Chip for Preclinical In Vitro Modeling of Uroaging"
+  },
+  {
+   "appl_id": 11433083,
+   "fiscal_year": 2026,
+   "project_num": "1R01AI202116-01",
+   "organization": {
+    "org_name": "UNIVERSITY OF DELAWARE"
+   },
+   "award_amount": 649728,
+   "award_notice_date": "2026-08-21T00:00:00",
+   "project_title": "Lactic Acid–Mediated Protection of the Cervicovaginal Epithelium"
+  }
+ ]
+}

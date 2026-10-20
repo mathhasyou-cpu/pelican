@@ -25,17 +25,21 @@ from datetime import date, timedelta
 
 from pelican.weak import asof
 from pelican.weak.dataset import FUNDING_WORDS
-from pelican.weak.live import LiveDoc, news_many
+from pelican.weak.live import LiveDoc, news_many_measured
 from pelican.weak.money import TEMPLATES
 
 #: Заголовков держим на запрос: RSS отдаёт до 100, и обрезка продукта (10) здесь слепит
 #: инструмент — у 161 из 196 кандидатов бэктеста исход был 0 именно из-за неё.
 LIMIT = 100
 
-#: Сумма в заголовке: «$51.6 Million», «$20M», «$1.2bn», «$500K». ⚠️ Только доллары: суммы в
-#: евро/рупиях/юанях остаются в счётчике `n`, но не в `usd`.
+#: Сумма в заголовке: «$51.6 Million», «$20M», «$1.2bn», «$500K», «$1,200 million»,
+#: «$500,000». ⚠️ Только доллары: суммы в евро/рупиях/юанях остаются в счётчике `n`, но не
+#: в `usd`. ⚠️ Запятая — разделитель ТЫСЯЧ (группы по три цифры), десятичная — только точка:
+#: в англоязычных заголовках так всегда, и «$1,200 million» читалось как 1.2 млн (PEL-H-08).
 _USD = re.compile(
-    r"\$\s?(\d{1,4}(?:[.,]\d{1,3})?)\s?(billion|million|thousand|bn|mn|m|k)\b", re.IGNORECASE
+    r"\$\s?(?:(\d{1,3}(?:,\d{3})+(?:\.\d+)?)|(\d+(?:\.\d+)?))"
+    r"(?:\s?(billion|million|thousand|bn|mn|m|k)\b)?",
+    re.IGNORECASE,
 )
 _SCALE = {
     "billion": 1e9,
@@ -62,16 +66,30 @@ class MoneyTrace:
 
 
 def parse_usd(title: str) -> float | None:
-    """Первая долларовая сумма заголовка в долларах; `None` — суммы нет."""
-    m = _USD.search(title)
-    if not m:
-        return None
-    number = float(m.group(1).replace(",", "."))
-    return number * _SCALE[m.group(2).lower()]
+    """Первая долларовая сумма заголовка в долларах; `None` — суммы нет.
+
+    Число без слова-масштаба засчитывается, только если в нём есть группы тысяч
+    («$500,000»): голое «$5» в заголовке — чаще цена, чем раунд.
+    """
+    for m in _USD.finditer(title):
+        grouped, plain, scale = m.group(1), m.group(2), m.group(3)
+        if scale:
+            return float((grouped or plain).replace(",", "")) * _SCALE[scale.lower()]
+        if grouped:
+            return float(grouped.replace(",", ""))
+    return None
 
 
 def is_funding(title: str) -> bool:
     return any(w in FUNDING_WORDS for w in title.lower().replace("-", " ").split())
+
+
+class MoneyUnchecked(RuntimeError):
+    """Google News не ответил на часть запросов: денежный след не измерен.
+
+    ⚠️ Не «денег нет»: отказ, прочитанный как ноль, — ложный исход и ложный признак у
+    бэктеста (`scripts/backtest_classifier.py`), как PEL-H-02 у живого запроса.
+    """
 
 
 def window(start: date, end: date) -> str:
@@ -169,9 +187,12 @@ def trace(
     held = asof.AS_OF
     asof.AS_OF = None
     try:
-        found = news_many(queries, "en", window=window(start, end), limit=LIMIT)
+        got = news_many_measured(queries, "en", window=window(start, end), limit=LIMIT)
     finally:
         asof.AS_OF = held
+    if missed := sum(docs is None for docs in got):
+        raise MoneyUnchecked(f"Google News не ответил на {missed} из {len(queries)} запросов")
+    found = [docs or [] for docs in got]
     out = []
     per = len(TEMPLATES)
     for i, label in enumerate(labels):

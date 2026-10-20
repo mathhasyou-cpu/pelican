@@ -31,7 +31,7 @@ from pelican import jobs, locks  # noqa: E402
 from pelican.config import settings  # noqa: E402
 from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.weak import page  # noqa: E402
-from pelican.weak.ask import deepen_top, write_cards  # noqa: E402
+from pelican.weak.ask import deepen_top, russian_summaries, write_cards  # noqa: E402
 from pelican.weak.assess import Evidence  # noqa: E402
 
 FIELDS = ("description", "advantage", "case")
@@ -54,6 +54,8 @@ def recard(d: dict) -> tuple[dict, float]:
     with locks.hold(MODEL_LOCK):
         deepen_top(shown, result.live_errors, print)
         write_cards(shown, print)
+        # Вне запроса бюджета заказчика нет: резюме дописываются все.
+        russian_summaries([s for s, _ in shown], result.live_errors, print, deadline=float("inf"))
     return json.loads(page.to_json(result)), time.monotonic() - t0
 
 
@@ -71,6 +73,10 @@ def density(run: dict) -> dict[str, float]:
         "с якорем, доля": round(anchored / max(len(sents), 1), 2),
         "фактов хронологии на карточку": round(sum(len(s.get("facts") or []) for s in sigs) / n, 1),
         "источников на карточку": round(sum(len(s.get("sources") or []) for s in sigs) / n, 1),
+        "пусто why": sum(1 for s in sigs if not s.get("why")),
+        "зарубежных без резюме": sum(
+            1 for s in sigs for x in s.get("sources") or [] if x.get("lang") != "ru" and not x.get("summary_ru")
+        ),
     }
 
 
@@ -112,4 +118,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Исполнитель API держит замок `model` на время задания: «занято» — код 75, как у
+    # `measure_ask`, а не трассировка.
+    try:
+        main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

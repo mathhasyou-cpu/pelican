@@ -42,8 +42,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from pelican.config import settings  # noqa: E402
-from pelican.store import Store  # noqa: E402
 from pelican.llm import Breaker, LLMClient, LLMError  # noqa: E402
+from pelican.store import Store  # noqa: E402
+
 # noqa: E402
 from pelican.weak.tech import (  # noqa: E402
     BATCH_SIZE,
@@ -64,13 +65,11 @@ SINCE = "2023-08-01"
 
 
 def sample(store: Store, n: int, seed: int) -> list[Pending]:
-    """Выборка, повторяемая по seed.
+    """Выборка, повторяемая по seed: сортировка по хэшу id со сдвигом.
 
-    ⚠️ **`USING SAMPLE` через Quack молча отдаёт НОЛЬ строк** — без ошибки, без
-    предупреждения, и это неотличимо от «под фильтр ничего не подошло» (замер
-    15.09: тот же запрос по файлу работает). Поэтому выборка делается
-    сортировкой по хэшу: она и повторяема по seed, и идёт обычным планом.
-    Цена — полный проход, около 18 с на 2.9 млн строк; для замера это приемлемо.
+    `hashint8` — функция Postgres; ⚠️ `hash()` из DuckDB здесь не существует, и запрос с
+    ней падал на первом обращении. `TABLESAMPLE` не годится: он не повторяем по seed
+    вместе с фильтром. Цена — полный проход по отфильтрованным строкам; для замера приемлемо.
     """
     sql = f"""
     SELECT id, term_raw FROM works
@@ -78,7 +77,7 @@ def sample(store: Store, n: int, seed: int) -> list[Pending]:
       AND observed_at >= DATE '{SINCE}'
       AND NOT junk
       AND length(term_raw) >= 120
-    ORDER BY hash(id + {seed}) LIMIT {n}
+    ORDER BY hashint8(id + {int(seed)}) LIMIT {int(n)}
     """
     return [Pending(signal_id=int(r[0]), text=r[1]) for r in store.conn.execute(sql).fetchall()]
 
@@ -127,8 +126,8 @@ def main() -> None:
     ap.add_argument("--show", type=int, default=40)
     args = ap.parse_args()
 
-    store = Store(settings.storage_target)
-    rows = sample(store, args.sample, args.seed)
+    with Store(settings.storage_target) as store:
+        rows = sample(store, args.sample, args.seed)
     print(f"выборка: {len(rows)} аннотаций с {SINCE}, модель {settings.llm_model}")
 
     stats = TechStats(pending=len(rows))

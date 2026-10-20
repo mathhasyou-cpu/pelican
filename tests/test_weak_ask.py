@@ -37,9 +37,9 @@ from pelican.weak.trust import HIGH, LOW, MEDIUM, classify, corroborated
         ("https://www.prnewswire.com/news/x", LOW),
         ("https://habr.com/ru/articles/1/", LOW),
         ("https://someone.substack.com/p/x", LOW),
-        # ⚠️ Неизвестный домен — средняя, а не высокая: иначе правило ТЗ обходится
-        # любым новым доменом.
-        ("https://unknown-industry-outlet.example/x", MEDIUM),
+        # ⚠️ Неизвестный домен — «не оценена», а не высокая и не средняя: иначе правило
+        # ТЗ обходится любым новым доменом.
+        ("https://unknown-industry-outlet.example/x", "unknown"),
     ],
 )
 def test_trust_levels(url: str, level: str) -> None:
@@ -51,6 +51,8 @@ def test_corroboration_needs_something_above_low() -> None:
     levels = [classify(u).level for u in ("prnewswire.com", "habr.com")]
     assert not corroborated(levels)
     assert corroborated(levels + [classify("arxiv.org").level])
+    # Безымянный сайт основанием не считается (PEL-H-07).
+    assert not corroborated(levels + [classify("unknown-industry-outlet.example").level])
 
 
 # ------------------------------------------------------------------ оценка моделью
@@ -163,12 +165,24 @@ def test_card_blanks_uncited_sections() -> None:
     assert c.summaries == {1: "Статья о защите."}
 
 
+def test_card_keeps_cited_advantage_without_latin_name() -> None:
+    """Предложение со ссылкой и без чисел остаётся, даже если в нём нет латинского имени:
+    так пишется большинство конкретных преимуществ (scripts/measure_card_drops.py)."""
+    c = card_mod.parse(
+        {"title": "т", "description": "", "case": "", "facts": [], "summaries": [],
+         "advantage": "Сенолитическая терапия снижает воспаление в эпителии при ХОБЛ [1]."},
+        "x",
+        CARD_EV,
+    )
+    assert c.advantage == "Сенолитическая терапия снижает воспаление в эпителии при ХОБЛ [1]."
+
+
 def test_card_drops_sentences_without_facts_or_with_invented_numbers() -> None:
     c = card_mod.parse(
         {
             "title": "t",
             "description": "Метод проверяет память [1]. Точность выросла до 97% [1].",
-            "advantage": "Технология обладает большим потенциалом [1]. Keycard снизил утечки [2].",
+            "advantage": "Технология быстрее в 40 раз [1]. Keycard снизил утечки [2].",
             "case": "Keycard привлёк $25M [2]. Keycard привлёк $10M в 2026 [2].",
             "facts": [
                 {"date": "2026-07-08", "text": "Keycard привлёк $10M [2]."},
@@ -209,17 +223,40 @@ def test_excluded_get_russian_titles(monkeypatch) -> None:
     """ТЗ: выдача на русском — исключённые получают русское название; чужое письмо не берётся."""
     import pelican.weak.ask as ask_mod
 
+    calls: list[str] = []
+
     async def fake(_system, user, _schema, _name, _tokens):
-        assert "1. edge ai chips" in user
-        return {"items": ["Чипы для периферийного ИИ", "आधार"]}
+        calls.append(user)
+        if len(calls) == 1:
+            return {"items": ["Чипы для периферийного ИИ", "आधार", "Edge Memory Guard"]}
+        return {"items": ["other", "Защита памяти на периферии"]}
 
     monkeypatch.setattr(ask_mod, "_one", fake)
-    a = Signal(label="edge ai chips", title="edge ai chips", kind=MATURE, kind_label="",
-               stage=PILOT, confidence=0.0, checks=[], why="")
-    b = Signal(label="other", title="other", kind=MATURE, kind_label="", stage=PILOT,
-               confidence=0.0, checks=[], why="")
-    ask_mod.russian_titles([a, b])
-    assert (a.title, b.title) == ("Чипы для периферийного ИИ", "other")
+    a, b, c = (Signal(label=x, title=x, kind=MATURE, kind_label="", stage=PILOT, confidence=0.0,
+                      checks=[], why="") for x in ("edge ai chips", "other", "edge memory guard"))
+    ask_mod.russian_titles([a, b, c])
+    # Чужое письмо и латинский «перевод» спрашиваются ещё раз, только они (PQA-004).
+    assert calls[1] == "1. other\n2. edge memory guard"
+    assert (a.title, b.title, c.title) == ("Чипы для периферийного ИИ", "other", "Защита памяти на периферии")
+    assert len(calls) == 2
+
+
+def test_card_title_must_be_russian() -> None:
+    """Латиница — «своё» письмо для текста карточки, но не для заголовка (NFR-01)."""
+    base = {"description": "", "advantage": "", "case": "", "facts": [], "summaries": []}
+    assert card_mod.parse(base | {"title": "Latent Space Probing"}, "latent space probing", CARD_EV).title == "latent space probing"
+    assert card_mod.parse(base | {"title": "Зондирование латентного пространства (LSP)"}, "x", CARD_EV).title.startswith("Зонд")
+    assert card_mod.has_cyrillic("RAG для банков") and not card_mod.has_cyrillic("Secure MPC")
+
+
+def test_excluded_why_names_the_judgments_when_model_why_was_dropped() -> None:
+    """BR-03: у исключённого причина есть всегда; без ссылки — признаки оценки (PQA-003)."""
+    from pelican.weak.ask import excluded_why
+
+    got = excluded_why(MATURE, {"routine_tool": 1.0, "players_named": 4.0, "pilot_mentioned": 0.0})
+    assert got.startswith("По признакам оценки: упоминается как рутинный инструмент; компаний названо в новостях: 4.")
+    assert "без ссылки" in excluded_why(MATURE, {})
+    assert excluded_why(EMERGING, {"routine_tool": 1.0}) == ""
 
 
 def test_card_hypothesis_needs_citation() -> None:
@@ -234,6 +271,31 @@ def test_card_hypothesis_needs_citation() -> None:
     # Точка сокращения внутри не режет гипотезу (финтех: «…Custodia Inc. Bank) начинают…»).
     cut = "Если банки (напр. Custodia Inc. Bank) начнут выпуск, то спрос вырастет [1]."
     assert card_mod.parse(base | {"hypothesis": cut}, "x", CARD_EV).hypothesis == cut
+
+
+def test_card_why_keeps_cited_text_and_only_a_verbatim_quote() -> None:
+    """«Почему это слабый сигнал» пишет карточка: чистка как у описания, а цитата-опора
+    показывается, только если дословно стоит в процитированном свидетельстве (ALCE)."""
+    base = {"title": "Т", "description": "", "advantage": "", "case": "", "facts": [],
+            "summaries": [], "hypothesis": ""}
+    why = "Защита памяти описана в работе [1], а Keycard уже привлёк $10M [2]."
+    kept = card_mod.parse(
+        base | {"why": why, "why_quote": "Keycard raises $10M for agent memory"}, "x", CARD_EV
+    )
+    assert kept.why == why
+    assert kept.why_quote == "Keycard raises $10M for agent memory"
+    # Цифра не та — это другая цитата; цитата из НЕпроцитированного свидетельства — тоже нет.
+    wrong = card_mod.parse(
+        base | {"why": why, "why_quote": "Keycard raises $19M for agent memory"}, "x", CARD_EV
+    )
+    assert wrong.why == why and wrong.why_quote == ""
+    only_one = card_mod.parse(
+        base | {"why": "Работа [1] о защите.", "why_quote": "Keycard raises $10M for agent memory"},
+        "x",
+        CARD_EV,
+    )
+    assert only_one.why_quote == ""
+    assert card_mod.parse(base | {"why": "Это слабый сигнал.", "why_quote": ""}, "x", CARD_EV).why == ""
 
 
 def test_stored_report_drops_foreign_script_on_render() -> None:
@@ -565,10 +627,11 @@ def test_merge_group_folds_spellings_of_one_direction() -> None:
             _pool_cand("ai cyber", "AI cybersecurity", "деньги", ["Kai", "Onyx"], ["b"]),
         ]
     )
-    # Ярлыком остался тот, за кем больше игроков; варианты и заголовки слиты.
-    assert got.label == "ai cyber"
+    # Ярлыком остался первый — порядок `_merge_near`, самое специфичное, а не тот, за кем
+    # больше игроков (PEL-C-04); варианты, игроки и заголовки слиты.
+    assert got.label == "ai cybersecurity"
     assert got.stream == "деньги"
-    assert got.companies == ["Kai", "Onyx"]
+    assert sorted(got.companies) == ["Kai", "Onyx"]
     assert sorted(got.members) == ["ai cyber", "ai cybersecurity"]
     assert len(got.headlines) == 2
 
@@ -634,7 +697,8 @@ def test_score_orders_by_model_probability_with_its_predictors() -> None:
     from pelican.weak import ask as ask_mod
     from pelican.weak import model as model_mod
 
-    if model_mod.load(model_mod.GROWTH_PARAMS) is None:
+    params = model_mod.load(model_mod.GROWTH_PARAMS)
+    if params is None:
         pytest.skip("weak/growth.json не обучена")
 
     def make(label: str, share: float, works: int, companies: list[str]) -> Signal:
@@ -649,7 +713,8 @@ def test_score_orders_by_model_probability_with_its_predictors() -> None:
     mid = make("mid", 0.5, 40, ["A"])
     assert ask_mod.score([stale, mid, fresh])
     assert fresh.confidence > mid.confidence > stale.confidence
-    assert len(fresh.predictors) == 3
+    # До трёх предикторов: признаки с нулевым весом из артефакта убраны (PEL-G-04).
+    assert len(fresh.predictors) == min(3, len(params["features"]))
     assert not ask_mod.score([])
 
 
@@ -838,3 +903,162 @@ def test_installed_listed_model_gets_every_feature_it_was_trained_on() -> None:
         | {"industry_share"}
     )
     assert not set(params["features"]) - built
+
+
+def test_assign_facets_by_grounded_works_then_by_vectors(monkeypatch) -> None:
+    """Сектор радара: научный кандидат — фасет, давший его работы; денежный — ближайший
+    фасет по векторам; сбой эмбеддера — без направления, а не угаданный сектор."""
+    from types import SimpleNamespace
+
+    import httpx
+    import numpy as np
+
+    from pelican.weak import ask as ask_mod
+
+    hit = lambda sid: SimpleNamespace(signal_id=sid)  # noqa: E731
+    hits = [[hit(1), hit(2)], [hit(3), hit(4), hit(5)]]
+    by_tech = {"zk kyc": [1, 3, 4], "zk proofs": [5], "agent mandates": [77]}
+    cands = [
+        _Cand("zk kyc", ["zk kyc", "zk proofs"], "наука"),
+        _Cand("agent mandates", ["agent mandates"], "деньги"),
+    ]
+    facets = ["платежи агентов", "идентификация и KYC"]
+    vec = {"платежи агентов": [1.0, 0.0], "идентификация и KYC": [0.0, 1.0], "agent mandates": [0.9, 0.1]}
+    monkeypatch.setattr(ask_mod, "vectors_for", lambda texts: np.array([vec[t] for t in texts]))
+    assert ask_mod.assign_facets(cands, facets, hits, by_tech) == {"zk kyc": 1, "agent mandates": 0}
+
+    def down(_texts):
+        raise httpx.ConnectError("эмбеддер недоступен")
+
+    monkeypatch.setattr(ask_mod, "vectors_for", down)
+    assert ask_mod.assign_facets(cands, facets, hits, by_tech) == {"zk kyc": 1}
+
+
+def test_facet_survives_the_saved_report() -> None:
+    result = _result()
+    result.signals[0].facet = 2
+    assert from_json(json.loads(to_json(result))).signals[0].facet == 2
+
+
+# ------------------------------------------------------------------ состав оценки (PEL-E-01/E-02)
+
+
+def test_backing_headlines_never_push_corpus_out_of_assessment() -> None:
+    """Добор заголовков под компании идёт ПОСЛЕ работ и следа: оценщик видит их всегда."""
+    from datetime import date
+
+    from pelican.weak.ask import _evidence
+    from pelican.weak.assess import CORPUS, EVIDENCE
+    from pelican.weak.core import Footprint
+
+    def doc(n: int) -> LiveDoc:
+        return LiveDoc("google_news", f"h{n}", f"https://x/{n}", "2026-07-01", "TechCrunch", "en")
+
+    works = [("2026-01-01", f"paper {i}", f"https://p/{i}", "arxiv", i) for i in range(2)]
+    fp = Footprint("x", 10, 2020, 3)
+    ev, sources, assessed = _evidence(
+        [doc(i) for i in range(5)], [doc(10 + i) for i in range(3)], works, fp, fp, date(2026, 9, 1)
+    )
+    assert len(ev) == len(sources) == 11
+    assert assessed == EVIDENCE == 8
+    shown = ev[:assessed]
+    assert shown[-1].kind == CORPUS and sum(e.kind == PAPER for e in shown) == 2
+    # Номера источников идут в том же порядке, что свидетельства.
+    assert [s.title for s in sources[8:]] == ["h10", "h11", "h12"]
+
+
+def test_truncated_assessment_retried_with_bigger_budget(monkeypatch) -> None:
+    from pelican.llm import LLMTruncated
+    from pelican.weak import ask as ask_mod
+
+    budgets = []
+
+    async def fake_one(system, user, schema, name, max_tokens):
+        budgets.append(max_tokens)
+        if len(budgets) == 1:
+            raise LLMTruncated("обрезан")
+        return {"kind": EMERGING, "stage": PILOT, "why": "растёт [1]"}
+
+    monkeypatch.setattr(ask_mod, "_one", fake_one)
+    ev = [Evidence(-1, "2026-07-01", "заголовок", NEWS)]
+    got = ask_mod._assess(Candidate("x", "x", ev, ""))
+    assert got.kind == EMERGING and budgets == [ask_mod.ASSESS_TOKENS, 2 * ask_mod.ASSESS_TOKENS]
+
+
+# ------------------------------------------------------------------ резюме источников (ТЗ)
+
+
+def test_russian_summaries_fill_only_foreign_sources_without_one(monkeypatch) -> None:
+    """Источник без резюме карточки получает машинное русское; русский и уже описанный —
+    не трогаются; ответ чужим письмом не показывается."""
+    import time
+
+    from pelican.weak import ask as ask_mod
+
+    sig = _result().signals[0]
+    sig.sources.append(Source(3, "Новость", "https://x/3", "2026-07-01", "отраслевое медиа", NEWS, "ru", MEDIUM, "средняя"))
+    sig.sources.append(Source(4, "Paper four", "https://x/4", "2026-07-01", "препринт", PAPER, "en", HIGH, "высокая"))
+    asked = []
+
+    async def fake_one(system, user, schema, name, max_tokens):
+        asked.append(user)
+        return {"items": ["1. Работа о проверке агентов.", "論文"]}
+
+    monkeypatch.setattr(ask_mod, "_one", fake_one)
+    errors: dict[str, str] = {}
+    ask_mod.russian_summaries([sig], errors, lambda _m: None, time.monotonic() + 60)
+    by_n = {s.n: s for s in sig.sources}
+    assert asked == ["1. Статья <script>\n2. Paper four"]
+    assert by_n[2].summary_ru == "Работа о проверке агентов." and by_n[2].machine_summary
+    assert by_n[4].summary_ru == "" and by_n[3].summary_ru == ""
+    assert by_n[1].summary_ru == "Стартап привлёк раунд." and not errors
+
+
+def test_russian_summaries_stop_at_deadline_with_a_note(monkeypatch) -> None:
+    from pelican.weak import ask as ask_mod
+
+    sig = _result().signals[0]
+    monkeypatch.setattr(ask_mod, "_one", lambda *a: pytest.fail("вызов после дедлайна"))
+    errors: dict[str, str] = {}
+    ask_mod.russian_summaries([sig], errors, lambda _m: None, deadline=0.0)
+    assert "бюджет времени" in errors["summaries"] and sig.sources[1].summary_ru == ""
+
+
+# ------------------------------------------------------------------ правила требований (07 §8.6)
+
+
+def test_source_link_only_for_http_scheme() -> None:
+    """BR-24: `javascript:` и `data:` остаются текстом, `http(s)` — ссылкой."""
+    sig = _result().signals[0]
+    sig.sources = [
+        Source(1, "Опасная", "javascript:alert(1)", "2026-07-01", "отраслевое медиа", NEWS, "ru", MEDIUM, "средняя"),
+        Source(2, "Обычная", "https://x/2", "2026-07-01", "отраслевое медиа", NEWS, "ru", MEDIUM, "средняя"),
+    ]
+    from pelican.weak.page import _sources_table
+
+    table = _sources_table(sig.sources)
+    assert 'href="javascript' not in table and "Опасная" in table
+    assert 'href="https://x/2"' in table
+
+
+def test_players_check_is_neither_entry_nor_scored() -> None:
+    """OQ-20: «несколько игроков» — подпись: условием ТОП не подписан и в долю не идёт."""
+    players = Check("несколько независимых игроков", True, "", scored=False)
+    assert not players.entry and not players.counted
+    assert Check("научная опора", True, "").counted
+    assert not Check("жанр", True, "", entry=True).counted
+
+
+@pytest.mark.parametrize(("value", "on"), [("1", True), ("true", True), ("0", False), ("", False)])
+def test_listed_in_ask_flag_parses_value(monkeypatch, value: str, on: bool) -> None:
+    """BR-50: `WEAK_LISTED_IN_ASK=0` выключает флаг, а не включает."""
+    import importlib
+
+    from pelican.weak import flags
+
+    monkeypatch.setenv("WEAK_LISTED_IN_ASK", value)
+    try:
+        assert importlib.reload(flags).LISTED_IN_ASK is on
+    finally:
+        monkeypatch.delenv("WEAK_LISTED_IN_ASK")
+        importlib.reload(flags)

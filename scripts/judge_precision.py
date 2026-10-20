@@ -73,8 +73,10 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import httpx  # noqa: E402
 
+from pelican import locks  # noqa: E402
 from pelican.config import settings  # noqa: E402
 from pelican.llm import LLMClient  # noqa: E402
+from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.weak.stats import span  # noqa: E402
 
 PAIRS = REPO / "scripts" / "precision_pairs.tsv"
@@ -334,6 +336,13 @@ def sample(folder: Path, n: int, seed: int) -> None:
     зрелость) и источники со ссылками. Без следа и ссылок задача нерешаема — первая же
     попытка разметки это показала.
     """
+    # ⚠️ Файл разметки — единственная ручная разметка проекта: повторный `--sample` поверх
+    # заполненных ответов стирал её молча (PEL-G-10).
+    if PAIRS.exists() and any(
+        (r.get("годится? да/нет") or "").strip()
+        for r in csv.DictReader(PAIRS.read_text(encoding="utf-8").splitlines(), delimiter="\t")
+    ):
+        raise SystemExit(f"{PAIRS} уже размечен рукой — переименуйте его, прежде чем выписывать новый")
     runs = _runs(folder)
     pool = [
         (domain, i, sig)
@@ -457,4 +466,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Модель одна на стенд (NFR-26): исполнитель API держит тот же замок — «занято» = код 75.
+    try:
+        with locks.hold(MODEL_LOCK):
+            main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

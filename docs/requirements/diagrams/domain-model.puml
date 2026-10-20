@@ -1,0 +1,164 @@
+@startuml domain-model
+' Доменная модель АС ПЕЛИКАН: понятия глоссария (03-glossary.md) и их связи.
+' Пунктирный пакет — статус «Прототип» (этап 6): сущностей в коде нет.
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide circle
+
+package "Запрос и очередь" {
+  class "Запрос\n(query)" as Query {
+    text: str (>= 3 символов)
+  }
+  class "Задание\n(job)" as Job {
+    id
+    status: queued | running | done | failed | cancelled
+    created, started, finished
+    progress: [строка]
+    error, error_detail
+    client (IP; автор при отмене)
+    touched
+    cancel: bool (отмена идущего —\n на границе стадии)
+  }
+  class "Событие прогона\n(job_event)" as Event {
+    seq
+    at: секунды от старта
+    t: stage | facets | counts | verdict |\n relevance | top | patents | card |\n titles | done | failed
+    data
+  }
+}
+
+package "Отчёт" {
+  class "Отчёт\n(report)" as Report {
+    name = YYYYmmdd-HHMMSS
+    query, started
+    version (REPORT_VERSION)
+    result: AskResult (JSON)
+    html (пользователю не отдаётся), summary
+    models: [{model, role, endpoint}]
+    live_by_source, live_errors
+    candidates, sources_processed
+  }
+  class "Направление запроса\n(facet)" as Facet {
+    index, letter
+    facet_ru, facet_en
+  }
+  class "Подрынок\n(submarket)" as Submarket
+  class "Кандидат\n(_Cand)" as Cand {
+    label, variants
+    stream: наука | деньги
+    core
+  }
+  class "Сигнал\n(Signal)" as Signal {
+    label, title, core
+    kind: один из 6 классов
+    stage: одна из 4 ступеней\n (лестница вех, BR-15)
+    judgments: 12 чтений
+    relevance: 0..3
+    confidence: 0..1
+    predictors
+    facet
+    why, why_quote
+    description, advantage, case
+    hypothesis
+    companies
+    corroborated
+    held / history_runs
+    layer_reason (watch)
+  }
+  class "Источник\n(Source)" as Source {
+    n, title, url, publisher
+    date, kind (тип), lang
+    trust: high | medium | low | unknown
+    summary_ru, machine_summary
+  }
+  class "Проверка свидетельств\n(Check)" as Check {
+    name, passed, detail
+    entry (условие ТОП, вне доли)
+    scored (False — подпись, вне доли)
+  }
+  class "След в корпусе\n(Footprint)" as Footprint {
+    works, since, share_last_year
+    low_visibility
+  }
+  class "Патентная активность" as Patents {
+    counts (два окна)
+    recent: 3 патента с заявителем
+  }
+}
+
+package "Корпус" {
+  class "Работа\n(work)" as Work {
+    id (md5 от данных)
+    source: arxiv | openalex
+    term_raw, observed_at
+    url, field, junk
+    collected_at
+  }
+  class "Разметка приёма\n(tech_mention)" as Tech {
+    tech, role: proposes | uses | reviews
+    model
+  }
+  class "Шард векторов" as Shard {
+    float16 768
+  }
+}
+
+package "Модели" {
+  class "Генеративная модель" as LLM
+  class "Эмбеддер" as Emb
+  class "Модель роста\ngrowth.json" as Growth
+  class "Модель этапа 1\nmodel.json" as Stage1
+}
+
+package "Исследования (Прототип)" <<Frame>> {
+  class "Ветка\n(thread)" as Thread {
+    thread_id = корневой отчёт
+  }
+  class "Шаг\n(step)" as Step {
+    parent, focus: facet | signal
+    new: [label]
+  }
+  class "Статья\n(article)" as Article {
+    kind: thread | digest
+    body, refs ⟦k⟧
+    model
+  }
+  class "Тема\n(topic)" as Topic {
+    query, cadence
+    next_run, active
+    write_article, notify_min
+  }
+  class "Прогон темы\n(topic_run)" as TopicRun {
+    added, moved, gone
+  }
+}
+
+Query "1" -- "0..*" Job
+Job "1" -- "0..*" Event
+Job "0..1" -- "0..1" Report : report
+Report "1" *-- "1..6" Facet
+Report "1" *-- "0..*" Submarket
+Report "1" *-- "0..45" Cand
+Cand "1" --> "0..1" Signal : после оценки
+Report "1" *-- "0..15" Signal : signals (ТОП)
+Report "1" *-- "0..*" Signal : thin, excluded, watch
+Signal "0..*" --> "0..1" Facet : facet
+Signal "1" *-- "1..*" Source
+Signal "1" *-- "0..*" Check
+Signal "1" -- "1" Footprint
+Signal "1" -- "0..1" Patents
+Signal "0..*" ..> "0..*" Work : свидетельства PAPER
+Work "1" -- "0..1" Tech
+Work "1" -- "1" Shard : вектор
+Report "1" --> "1..*" LLM : models
+Signal ..> Growth : confidence
+Stage1 ..> Signal : только оценка на датасете
+
+Thread "1" *-- "1..*" Step
+Step "1" -- "1" Report
+Thread "0..1" -- "0..*" Article
+Topic "1" -- "0..1" Thread
+Topic "1" *-- "0..*" TopicRun
+TopicRun "1" -- "1" Report
+TopicRun "0..1" -- "0..1" Article : digest
+@enduml

@@ -110,6 +110,34 @@ def stage_floor(stage: str, judgments: dict[str, float]) -> str:
     return stage
 
 
+#: Вехи стадии (`assess.JUDGMENTS`) от старшей к младшей: ступень — старшая прочитанная.
+#: Приём — лестница проверяемых вех вместо выбора по шкале: TRL (NASA/EU — уровень
+#: присваивается по достигнутой вехе) в LLM-исполнении RAIL (arXiv:2608.13428 — evidence
+#: ladder + детерминированное правило сборки) и CheckEval (arXiv:2403.18771 — булевы
+#: вопросы вместо шкалы: согласие оценщиков выше, разброс ниже).
+_STAGE_LADDER = (
+    ("generally_available", EARLY),
+    ("pilot_with_customer", PILOT),
+    ("prototype_built", PROTOTYPE),
+)
+
+
+def evidence_stage(stage: str, judgments: dict[str, float]) -> str:
+    """Ступень для выдачи: по лестнице вех, если оценка их прочла, иначе `stage_floor`.
+
+    Выбор модели одним полем схлопывал шкалу в «по чему судили»: новость о стартапе —
+    «раннее внедрение», одни статьи — «концепция», пилот на контроле угадан 0 раз из 23.
+    Лестница ставит ступень и НИЖЕ выбора модели: раунд и анонс — не продажи.
+    ⚠️ Как и пол, применяется ПОСЛЕ скоринга: `stage` модели остаётся её признаком.
+    """
+    if not any(key in judgments for key, _ in _STAGE_LADDER):
+        return stage_floor(stage, judgments)  # оценка старого формата — вех нет
+    for key, rung in _STAGE_LADDER:
+        if judgments.get(key):
+            return rung
+    return CONCEPT
+
+
 def parse_stage(text: str) -> str | None:
     """Ступень из записи методолога. Гибрид «A → B» — по поздней ступени."""
     low = text.lower()
@@ -134,11 +162,3 @@ def score(stage: str, trend: str) -> int:
     if trend not in TREND_RANK:
         raise ValueError(f"неизвестный тренд {trend!r}; ожидался один из {TRENDS}")
     return STAGE_RANK[stage] + TREND_RANK[trend]
-
-
-def explain(stage: str, trend: str) -> str:
-    """Человекочитаемая арифметика балла — она же объяснение для карточки."""
-    return (
-        f"{STAGE_LABELS[stage]} ({STAGE_RANK[stage]}) + "
-        f"{TREND_LABELS[trend]} ({TREND_RANK[trend]}) = {score(stage, trend)}"
-    )

@@ -1,0 +1,28 @@
+[
+ {
+  "id": 25321,
+  "name": "Rosebud Biosciences",
+  "slug": "rosebud-biosciences",
+  "website": "https://rosebudbiosciences.com/",
+  "one_liner": "Growing micro-organs to find new drugs",
+  "long_description": "Rosebud Biosciences accelerates drug development by screening drugs against organoids (micro-organs) that have the same gene mutations as the patients. We partner with therapeutics companies to screen their drugs, and we perform our own drug discovery for rare diseases that have no existing treatments. Our organoids are also fetal-like and enable discovery of novel drug targets for pediatric diseases. This technology was validated at Stanford, published in a prestigious journal, and has already led to the discovery of a drug target in a pediatric heart disease that could not have been found using traditional disease models.",
+  "launched_at": 1646685843,
+  "batch": "Winter 2022",
+  "status": "Active",
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/rosebud-biosciences"
+ },
+ {
+  "id": 5,
+  "name": "CircuitHub",
+  "slug": "circuithub",
+  "website": "https://circuithub.com",
+  "one_liner": "On-Demand Electronics Manufacturing",
+  "long_description": "CircuitHub offers on-demand electronics manufacturing powered by our factory-scale robotics platform, The Grid. This platform delivers a 10x improvement in the speed and cost of small-batch electronics production. Leading customers like Tesla, NASA, and Zipline rely on CircuitHub to cut their time to market in half.",
+  "launched_at": 1322045523,
+  "batch": "Winter 2012",
+  "status": "Active",
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/circuithub"
+ }
+]

@@ -284,8 +284,9 @@ def in_query(rows: list[dict]) -> list[dict]:
             }
             for r in group
         ]
-        for r, feats in zip(group, query_features(raw)):
-            r.update({k: str(v) for k, v in feats.items()})
+        for r, feats in zip(group, query_features(raw), strict=True):
+            # Пропуск — пустая ячейка (`column` читает её как NaN → медиана импутации).
+            r.update({k: "" if v is None else str(v) for k, v in feats.items()})
     return pool
 
 
@@ -312,9 +313,21 @@ def matrix(rows: list[dict], names: tuple[str, ...]) -> np.ndarray:
 def outcome_vector(rows: list[dict], outcome: str) -> np.ndarray:
     if outcome == "grew_or_money":
         return np.array(
-            [int(float(r["grew_excess"]) > 0 or float(r["money_grew"]) > 0) for r in rows]
+            [int(float(r["grew_excess"] or 0) > 0 or float(r["money_grew"]) > 0) for r in rows]
         )
     return np.array([int(float(r[outcome])) for r in rows])
+
+
+def with_outcome(rows: list[dict], outcome: str) -> list[dict]:
+    """Строки, у которых исход определён. Пусто — тонкая база ядра на срезе
+    (`backtest_classifier.MIN_BASE`, PEL-G-06): рост от нуля — это «появилась ли работа».
+
+    ⚠️ Вызывается ПОСЛЕ `in_query`: признаки запроса считаются по всему пулу, как в выдаче,
+    из обучения и проверки уходит только исход.
+    """
+    if outcome == "grew_or_money":
+        return rows
+    return [r for r in rows if r.get(outcome, "") not in ("", None)]
 
 
 def is_money(outcome: str) -> bool:
@@ -329,7 +342,10 @@ def value_column(outcome: str) -> str:
 
 
 def pipeline(c: float, penalty: str) -> Pipeline:
-    solver = "liblinear" if penalty == "l1" else "lbfgs"
+    # ⚠️ L1 — `saga`, а не `liblinear`: liblinear штрафует свободный член вместе с весами,
+    # при L1 он занулялся, и всё смещение уходило в `b` Платта (PEL-G-04). saga его не
+    # штрафует; признаки отмасштабированы, поэтому сходимость в пределах `max_iter`.
+    solver = "saga" if penalty == "l1" else "lbfgs"
     return Pipeline(
         [
             ("impute", SimpleImputer(strategy="median")),
@@ -337,11 +353,25 @@ def pipeline(c: float, penalty: str) -> Pipeline:
             (
                 "est",
                 LogisticRegression(
-                    C=c, penalty=penalty, solver=solver, class_weight="balanced", max_iter=3000
+                    C=c, penalty=penalty, solver=solver, class_weight="balanced", max_iter=10000
                 ),
             ),
         ]
     )
+
+
+def oof_margins(
+    x: np.ndarray, y: np.ndarray, groups: np.ndarray, c: float, penalty: str
+) -> np.ndarray:
+    """LODO out-of-fold ОТСТУПЫ моделей с фиксированным `C` — того же, что у итоговой.
+
+    Платт калибрует ту модель, что идёт в прод, на её же out-of-fold выходах (Platt 1999);
+    отступы fold-моделей с другими `C` имеют другую шкалу (PEL-G-04).
+    """
+    out = np.zeros(len(y))
+    for tr, te in GroupKFold(n_splits=len(set(groups.tolist()))).split(x, y, groups):
+        out[te] = pipeline(c, penalty).fit(x[tr], y[tr]).decision_function(x[te])
+    return out
 
 
 def oof_scores(
@@ -709,6 +739,12 @@ def main() -> None:
     rows = [r for cut_rows in by_cut.values() for r in cut_rows]
     if args.in_query:
         rows = in_query(rows)
+    before = len(rows)
+    rows = with_outcome(rows, args.outcome)
+    if len(rows) < before:
+        print(f"без исхода (тонкая база ядра на срезе): {before - len(rows)} строк — не в обучении")
+    # Отбор устойчивых признаков (`stable_features`) идёт по срезам — тоже без строк без исхода.
+    by_cut = {name: [r for r in rows if r["срез"] == name] for name in by_cut}
     folder = folders[0] if len(folders) == 1 else Path("+".join(f.name for f in folders))
     groups = np.array([r["домен"] for r in rows])
     n_dom = len(set(groups.tolist()))
@@ -842,6 +878,7 @@ def main() -> None:
         test_rows = read_tsv(REPO / args.test_dir / "backtest-classifier.tsv")
         if args.in_query:
             test_rows = in_query(test_rows)
+        test_rows = with_outcome(test_rows, args.outcome)
         stem = "weak-growth-holdout" + (".in-query" if args.in_query else "")
         if money:
             stem = "weak-money-holdout"
@@ -864,7 +901,11 @@ def main() -> None:
     est_name, set_name = best_key.split(" / ")
     names = live_sets[set_name]
     x = matrix(rows, names)
-    final = pipeline(0.3, est_name.removeprefix("lr_")).fit(x, y_main)
+    penalty = est_name.removeprefix("lr_")
+    # ⚠️ `C` — выбранный той же процедурой на всех строках, а не константа: метрики выше
+    # получены вложенным подбором, и итоговая модель обязана быть её продуктом (PEL-G-04).
+    c_final = best_c(x, y_main, penalty)
+    final = pipeline(c_final, penalty).fit(x, y_main)
     coef = final.named_steps["est"].coef_[0]
     order = np.argsort(-np.abs(coef))
     imp = final.named_steps["impute"].transform(x)
@@ -987,21 +1028,26 @@ def main() -> None:
         )
     out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    # Модель роста в формате `weak/model.py`: Платт — на out-of-fold отступах LODO.
-    margin_oof = np.log(np.clip(best_oof, 1e-6, 1 - 1e-6) / np.clip(1 - best_oof, 1e-6, 1))
+    # Модель роста в формате `weak/model.py`: Платт — на LODO out-of-fold отступах моделей
+    # с тем же `C`, что у итоговой (`oof_margins`), и применяется к её отступу.
+    margin_oof = oof_margins(x, y_main, groups, c_final, penalty)
     platt = LogisticRegression(C=1e6, max_iter=5000).fit(margin_oof.reshape(-1, 1), y_main)
+    # Признак, обнулённый L1, в артефакт не идёт: он ничего не вносит, а в подписях и
+    # импутации выглядел бы работающим. Вероятность от этого не меняется.
+    keep = [i for i, v in enumerate(coef) if v != 0.0] or list(range(len(coef)))
     params = {
         "trained": date.today().isoformat(),
         "source": f"train_growth_model {folder.name} / {args.outcome}",
         "winner": best_key,
-        "features": list(names),
-        "impute_median": [float(v) for v in final.named_steps["impute"].statistics_],
-        "scale_mean": [float(v) for v in final.named_steps["scale"].mean_],
-        "scale_std": [float(v) for v in final.named_steps["scale"].scale_],
-        "coef": [float(v) for v in coef],
+        "C": c_final,
+        "features": [names[i] for i in keep],
+        "impute_median": [float(final.named_steps["impute"].statistics_[i]) for i in keep],
+        "scale_mean": [float(final.named_steps["scale"].mean_[i]) for i in keep],
+        "scale_std": [float(final.named_steps["scale"].scale_[i]) for i in keep],
+        "coef": [float(coef[i]) for i in keep],
         "intercept": float(final.named_steps["est"].intercept_[0]),
         "platt": {"a": float(platt.coef_[0][0]), "b": float(platt.intercept_[0])},
-        "log1p": sorted(LOGGED & set(names)),
+        "log1p": sorted(LOGGED & {names[i] for i in keep}),
         "metrics": {k: best[k] for k in ("auc", "auc_plain_cv", "floor", "top_median")},
         "gate": {"passed": bool(passed), "top_auc": top_auc, "pipeline_top_median": pipe_median},
         **({"pu_ceiling": ceiling} if ceiling else {}),

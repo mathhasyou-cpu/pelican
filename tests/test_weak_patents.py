@@ -204,10 +204,12 @@ def test_patent_line_is_rendered_with_both_numbers() -> None:
     assert "уверенность" in html
 
 
-def test_nothing_measured_renders_nothing() -> None:
+def test_nothing_measured_says_so_and_not_zero() -> None:
+    """Блок патентов в карточке виден всегда; пусто — «не проверялись», а не ноль."""
     from pelican.weak import page
 
-    assert page._patents(_signal("")) == ""
+    html = page._patents(_signal(""))
+    assert "не проверялись" in html and "0" not in html
 
 
 # --- маска «работ из будущего»: кэш обязан замечать выросший корпус ---
@@ -318,3 +320,27 @@ def test_robot_verdict_is_never_retried(monkeypatch) -> None:
     # Источник закрыт: следующий запрос даже не уходит.
     assert asyncio.run(patents._get(_Http(), "published-data/search", {})) is None
     assert len(calls) == 1
+
+
+def test_token_failure_closes_source_instead_of_raising(monkeypatch) -> None:
+    """Отказ выдачи токена на 15-й минуте — строка в отказах, а не потерянный прогон."""
+    import httpx
+
+    patents.reset()
+
+    async def broken_token(http):
+        raise httpx.ConnectTimeout("auth")
+
+    monkeypatch.setattr(patents, "_access_token", broken_token)
+    assert asyncio.run(patents._get(object(), "published-data/search", {})) is None
+    assert "ConnectTimeout" in patents.closed()
+
+
+def test_deadline_stops_queries(monkeypatch) -> None:
+    import time
+
+    patents.reset()
+    patents._deadline = time.monotonic() - 1
+    assert asyncio.run(patents._get(object(), "published-data/search", {})) is None
+    assert "бюджет времени" in patents.closed()
+    patents.reset()

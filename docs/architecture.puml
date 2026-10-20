@@ -4,18 +4,11 @@ skinparam shadowing false
 skinparam defaultFontName "Segoe UI"
 skinparam componentStyle rectangle
 left to right direction
+' плотнее по вертикали: схема ложится на широкий слайд
+skinparam nodesep 12
+skinparam ranksep 70
 
 actor "Эксперт" as user
-
-cloud "Открытые источники" {
-  [arXiv API] as arxiv
-  [OpenAlex API] as openalex
-  [Google News RSS\n(en, ru)] as gnews
-  [КиберЛенинка] as cyber
-  [Хабр] as habr
-  [GitHub Search] as github
-  [EPO OPS\n(патенты)] as epo
-}
 
 node "Хост (GPU)" {
   [LM Studio\ngemma-4-12b-qat\nembedding-gemma-300m] as llm
@@ -23,15 +16,15 @@ node "Хост (GPU)" {
 }
 
 package "docker compose" {
-  [ui\nStreamlit] as ui
   component "api\nFastAPI" as api {
+    [web/\nвеб-интерфейс] as web
     [очередь FIFO\n+ исполнитель] as worker
     [weak.ask\nконвейер запроса] as ask
   }
   database "postgres:18" as pg {
     [works\n15.2 млн работ\n+ GIN(tsvector)] as works
     [tech_mentions\ntech_groups] as tech
-    [jobs\nочередь] as jobs
+    [jobs, job_events\nочередь, ход прогона] as jobs
     [reports\nJSON + HTML] as reports
   }
   [tailscale\n(профиль stand)\nFunnel :443] as ts
@@ -42,26 +35,38 @@ package "ETL (по расписанию, вне запроса)" {
   [scripts/embed_science.py\nдокачка векторов] as embedsci
 }
 
+' облако объявлено последним — graphviz ставит его под compose, а не над ним
+cloud "Открытые источники" {
+  [arXiv API\nOpenAlex API] as sci
+  [Google News RSS (en, ru)\nКиберЛенинка, Хабр\nGitHub Search] as live
+  [EPO OPS\n(патенты)] as epo
+}
+
 user --> ts : HTTPS
-ts --> ui
-ui --> api : REST /api/*
+ts --> web : /
+web --> jobs : REST /api/*,\nопрос событий
 api --> jobs
+worker --> jobs : события прогона
 worker --> ask
 ask --> works : след корпуса\n(полнотекст)
 ask --> tech : приём в работах
 ask --> shards : поиск ближайших\nработ (косинус)
 ask --> llm : генерация,\nэмбеддинги
-ask --> gnews
-ask --> cyber
-ask --> habr
-ask --> github
+ask --> live : новости, игроки
 ask --> epo : финалистам ТОП
 worker --> reports
 
-arxiv --> collect
-openalex --> collect
+sci --> collect
 collect --> works : COPY,\nid из ключа
 works --> embedsci
 embedsci --> llm
 embedsci --> shards
+' ETL и хост — справа вверху, облако — под ETL: схема ложится на широкий слайд
+jobs -[hidden]-> collect
+jobs -[hidden]-> embedsci
+jobs -[hidden]-> llm
+reports -[hidden]-> shards
+tech -[hidden]-> live
+tech -[hidden]-> epo
+tech -[hidden]-> sci
 @enduml

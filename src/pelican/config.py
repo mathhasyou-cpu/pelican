@@ -8,6 +8,9 @@ from typing import Annotated
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# ⚠️ Корень репозитория только при установке `-e`: в образе Docker пакет лежит в
+# site-packages, `.env` по этому пути не находится, и настройки идут из окружения compose —
+# так и задумано.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -28,6 +31,11 @@ class Settings(BaseSettings):
     # Нативный `pelican.shard_server` для `api` в контейнере: проход по шардам через bind
     # mount втрое медленнее (docs/weak-demo.md §3). Пусто — шарды читает этот процесс.
     shards_url: str = ""
+    # Локальный адрес, с которого ходить в Google News (`weak.live`), — маршрут мимо VPN.
+    # Пусто — по маршруту по умолчанию. ⚠️ С домашнего провайдера `news.google.com` не
+    # отвечает (соединение висит до таймаута), поэтому на этой машине — пусто: Google идёт
+    # через VPN. В контейнере не задавать: адреса хоста там нет (compose обнуляет).
+    news_local_address: str = ""
 
     # Локальная модель — OpenAI-совместимый сервер (LM Studio). Одна и та же точка
     # отдаёт и генерацию, и эмбеддинги.
@@ -43,6 +51,11 @@ class Settings(BaseSettings):
     llm_reasoning_effort: str = "none"
     embedding_model: str = "google/embedding-gemma-300m"
     embedding_batch_size: int = 64
+    # Точка эмбеддингов, если она не та, что у генерации. Пусто — `llm_base_url` /
+    # `llm_api_key`. Нужна, когда генерация идёт в облачную модель без эмбеддингов (sonar
+    # в замере «локальная против облачной»), а корпус записан векторами LM Studio.
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
 
     github_token: str = ""
     # EPO OPS (патентные базы). Без обоих ключей патентный канал выключен.

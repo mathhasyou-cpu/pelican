@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import io as _io
 import json
+import statistics
 import sys
 from collections import Counter
 from datetime import date
@@ -145,29 +146,43 @@ def backtest_block() -> list[str]:
         here = [r for r in rows if r.get("где") == name]
         if not here:
             continue
-        ratios = sorted(float(r["во сколько раз"]) for r in here)
-        median = ratios[len(ratios) // 2]
-        with_news = sum(1 for r in here if int(r["новостей после среза"]) > 0)
+        # `statistics.median`, как в `backtest_signals`: верхний средний элемент при чётном n
+        # давал в отчёте сдачи другое число, чем в `backtest.json` того же прогона.
+        median = statistics.median(float(r["во сколько раз"]) for r in here)
+        # Пустая клетка — Google не ответил, «не проверено», а не ноль новостей.
+        checked = [r for r in here if str(r["новостей после среза"]).strip()]
+        with_news = sum(1 for r in checked if int(r["новостей после среза"]) > 0)
+        news = (
+            f"с новостями после среза {with_news} из {len(checked)} проверенных "
+            f"({with_news / len(checked):.0%}) {span(with_news, len(checked))}"
+            if checked
+            else "новости после среза не проверены"
+        )
         out += [
-            f"- **{name}** ({len(here)} направлений): медиана прироста следа ×{median:.2f}; "
-            f"с новостями после среза {with_news} из {len(here)} "
-            f"({with_news / len(here):.0%}) {span(with_news, len(here))}",
+            f"- **{name}** ({len(here)} направлений): медиана прироста следа ×{median:.2f}; {news}",
         ]
     sep = folder / "backtest.json"
     if sep.exists():
         d = json.loads(sep.read_text(encoding="utf-8"))
+        # Вывод — по условию, а не константой: при AUC ниже пола «разделение есть» ложно.
+        if d.get("auc") is None:
+            verdict = "Разделение НЕ ИЗМЕРИМО: строк с достаточной базой ядра на срезе нет"
+        elif float(d["auc"]) > float(d["пол"]):
+            verdict = "Разделение есть, но без пола это число читать нельзя"
+        else:
+            verdict = "Разделения НЕТ: AUC не выше пола случайности"
         out += [
             f"- **Разделение** (вероятность, что направление из ТОП выросло сильнее "
             f"случайного из контроля — статистика Манна–Уитни): **AUC {d['auc']}** при поле "
-            f"случайности {d['пол']}. ⚠️ Разделение есть, но слабое, и без пола это число "
-            "читать нельзя: на таких выборках случайное разбиение само даёт 0.55–0.58.",
+            f"случайности {d['пол']}. ⚠️ {verdict}: на таких выборках случайное разбиение "
+            "само даёт 0.55–0.58.",
         ]
     coverage = folder / "judge-coverage.tsv"
     if coverage.exists():
         covered = len({(r["домен"], r["строка датасета"]) for r in read(coverage)})
         out += [
-            f"- **Прогон на состоянии 2024 года находит {covered} строк** списка, который "
-            "методологи составили в сентябре 2026.",
+            f"- **Прогон на состоянии {folder.name.removeprefix('bt-')} находит {covered} "
+            "строк** списка, который методологи составили в сентябре 2026.",
         ]
     out += [
         "",
@@ -234,7 +249,8 @@ def model_block() -> list[str]:
         ),
         "",
     ]
-    if _json("weak-model.json").get("source") == "model_zoo":
+    # `train_signal_model` пишет свой источник; «model_zoo» — имя старой записи.
+    if str(_json("weak-model.json").get("source", "")).startswith(("train_signal_model", "model_zoo")):
         m = _json("weak-model.json")
         out += [
             f"В `weak-model.json` сохранён «{m['winner']}» (набор `{m['feature_set']}`); "
@@ -332,7 +348,13 @@ def output_block() -> list[str]:
         defects = REPORTS / "card-facts.tsv"
         refs = 0
         if defects.exists():
-            refs = sum(1 for r in read(defects) if "ссылка" in r.get("утверждение/дефект", ""))
+            # По точной формулировке дефекта (`measure_card_facts.letter`), а не по слову
+            # «ссылка»: в том же столбце лежат и тексты утверждений.
+            refs = sum(
+                1
+                for r in read(defects)
+                if "такого источника в карточке нет" in r.get("утверждение/дефект", "")
+            )
         out += [
             f"- **Достоверность карточки**: выдуманных чисел и дат {wrong - refs}, висячих "
             f"ссылок {refs} (всего {wrong} на {checks} проверяемых чисел и ссылок); карточек "

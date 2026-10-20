@@ -1,0 +1,108 @@
+/* Пеликан — оформление в стиле сайтов Газпрома и Газпромбанка: включается html[data-brand="gpb"].
+   Только переопределения токенов system.css и несколько брендовых правил поверх app.css.
+   Палитра снята с CSS gazprombank.ru (самые частые цвета их бандла): чернила #0A0A0B, серые
+   #323236 / #66666A / #EAEAEA, фон #F5F5F5, синий #2B61EC (тёмный #2042C2, светлый #476BF0),
+   голубые #E8ECFF / #C4E7FF, персиковый #FFC1A4; скругления 16 / 12, пилюли. Синяя лента героя —
+   корпоративный синий «Газпрома», Pantone 300 ≈ #005EB8. Фирменный шрифт банка закрыт лицензией —
+   остаётся общий TikTok Sans, только без широких показаний. Знаков и логотипов компаний нет. */
+
+:root[data-brand="gpb"] {
+  --bg: #F5F5F5;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6FA;
+  --surface-3: #EAECF4;
+  --line: #EAEAEA;
+  --line-2: #D9D9D9;
+  --ink: #0A0A0B;
+  --ink-2: #323236;
+  --muted: #66666A;
+  --accent: #2B61EC;      /* белый на нём ≈ 5,2 : 1 */
+  --accent-2: #2042C2;
+  --ref: var(--accent-2);
+  --accent-soft: #DCE5FF;
+  --accent-ink: #FFFFFF;
+  --cut: #B7B7B7;
+  --track: #EAECF4;
+  --focus: #2B61EC;
+  --band-0: #C9D5FB; --band-1: #DCE4FD; --band-2: #EAEFFE; --band-3: #F6F8FF;
+  --sh-1: none;
+  --sh-2: 0 6px 24px -12px rgb(10 10 11 / .16);
+  --sh-3: 0 20px 56px -16px rgb(10 10 11 / .28);
+  --r-md: 12px;
+  --wide: 100%;   /* у банка ровный гротеск: показания обычной ширины; знак АС ПЕЛИКАН остаётся широким */
+  --hero-a: #005EB8; --hero-b: #2B61EC; --hero-c: #476BF0;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-brand="gpb"]:not([data-theme="light"]) {
+    --bg: #0A0A0B; --surface: #1B1C1F; --surface-2: #232427; --surface-3: #2E2E30;
+    --line: #2E2E30; --line-2: #3F3F44;
+    --ink: #FFFFFF; --ink-2: #EAEAEA; --muted: #A6A6A6;
+    --accent: #476BF0; --accent-2: #6F8CF5; --accent-soft: #1E2B5C; --accent-ink: #FFFFFF; --ref: var(--accent-2);
+    --cut: #6F6F6F; --track: #2E2E30; --focus: #6F8CF5;
+    --band-0: #22305F; --band-1: #1C274C; --band-2: #171F3A; --band-3: #13182B;
+    --sh-2: 0 10px 30px -12px rgb(0 0 0 / .7); --sh-3: 0 28px 70px -12px rgb(0 0 0 / .8);
+    --hero-a: #003A80; --hero-b: #1F47B8; --hero-c: #2B61EC;
+  }
+}
+:root[data-brand="gpb"][data-theme="dark"] {
+  --bg: #0A0A0B; --surface: #1B1C1F; --surface-2: #232427; --surface-3: #2E2E30;
+  --line: #2E2E30; --line-2: #3F3F44;
+  --ink: #FFFFFF; --ink-2: #EAEAEA; --muted: #A6A6A6;
+  --accent: #476BF0; --accent-2: #6F8CF5; --accent-soft: #1E2B5C; --accent-ink: #FFFFFF; --ref: var(--accent-2);
+  --cut: #6F6F6F; --track: #2E2E30; --focus: #6F8CF5;
+  --band-0: #22305F; --band-1: #1C274C; --band-2: #171F3A; --band-3: #13182B;
+  --sh-2: 0 10px 30px -12px rgb(0 0 0 / .7); --sh-3: 0 28px 70px -12px rgb(0 0 0 / .8);
+  --hero-a: #003A80; --hero-b: #1F47B8; --hero-c: #2B61EC;
+}
+
+/* типографика: плотнее и жирнее, как у банка */
+[data-brand="gpb"] .display, [data-brand="gpb"] .h1 { font-weight: 700; }
+[data-brand="gpb"] .h2, [data-brand="gpb"] .card header h2 { font-weight: 700; }
+
+/* шапка — сплошная, как на сайтах банка */
+[data-brand="gpb"] .topbar { background: color-mix(in srgb, var(--surface) 92%, transparent); }
+
+/* главное действие и выбранное — синим */
+[data-brand="gpb"] .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+[data-brand="gpb"] .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+[data-brand="gpb"] .btn { border-radius: 12px; }
+[data-brand="gpb"] .btn.sm { border-radius: 10px; }
+[data-brand="gpb"] .fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+[data-brand="gpb"] .fchip[aria-pressed="true"] .lt { background: #fff; color: var(--accent); }
+[data-brand="gpb"] .fchip[aria-pressed="true"] .n { background: rgb(0 0 0 / .2); }   /* белый на осветлённом синем < 4,5 : 1 (NFR-72) */
+[data-brand="gpb"] .doc .toolbar .btn { color: #fff; }
+[data-brand="gpb"] .doc .toolbar .btn:hover { background: var(--accent-2); border-color: var(--accent-2); }
+[data-brand="gpb"] .navlink[aria-current="page"] { color: var(--ref); }   /* --accent в тёмной теме < 4,5 : 1 (NFR-72) */
+[data-brand="gpb"] .surface, [data-brand="gpb"] .stat, [data-brand="gpb"] .kpis, [data-brand="gpb"] .rcard { border-color: transparent; }
+[data-brand="gpb"] .hist { border-color: transparent; }
+
+/* герой входа — синяя лента */
+[data-brand="gpb"] .hero { margin: var(--sp-6) 0 var(--sp-10); padding-left: clamp(16px, 4vw, 56px); padding-right: clamp(16px, 4vw, 56px);
+  border-radius: 24px; color: #fff; background: radial-gradient(120% 140% at 85% 0%, var(--hero-c), transparent 60%), linear-gradient(135deg, var(--hero-a), var(--hero-b)); }
+[data-brand="gpb"] .hero .lead, [data-brand="gpb"] .hero .note, [data-brand="gpb"] .hero .examples .muted { color: rgb(255 255 255 / .82); }
+[data-brand="gpb"] .hero-rings { stroke: rgb(255 255 255 / .2); }
+[data-brand="gpb"] .hero-rings .blip { fill: #C4E7FF; stroke: transparent; }
+[data-brand="gpb"] .hero-rings .blip.soft { fill: #FFC1A4; stroke: transparent; opacity: .9; }
+[data-brand="gpb"] .hero-rings .halo { stroke: #C4E7FF; }
+[data-brand="gpb"] .hero .pill { background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .3); color: #fff; }
+[data-brand="gpb"] .hero .pill:hover { background: rgb(255 255 255 / .22); border-color: #fff; }
+[data-brand="gpb"] .hero .pill .ic { color: #C4E7FF; }
+[data-brand="gpb"] .hero::after { display: none; }
+[data-brand="gpb"] .hero .eyebrow { color: #C4E7FF; }
+[data-brand="gpb"] .ask { border-color: transparent; box-shadow: 0 16px 40px -16px rgb(0 20 60 / .5); }
+[data-brand="gpb"] .ask:focus-within { box-shadow: 0 0 0 4px rgb(196 231 255 / .6), 0 16px 40px -16px rgb(0 20 60 / .5); }
+
+/* радар: «средняя» уверенность — голубым, «высокая» — синим с белым номером */
+[data-brand="gpb"] .radar .dot.mid, [data-brand="gpb"] .radar .dot.new, [data-brand="gpb"] .radar-key .dk.mid { background: #C4E7FF; color: #0A0A0B; }
+[data-brand="gpb"][data-theme="dark"] .radar .dot.mid, [data-brand="gpb"][data-theme="dark"] .radar .dot.new, [data-brand="gpb"][data-theme="dark"] .radar-key .dk.mid { background: #2B4A8F; color: #fff; }
+@media (prefers-color-scheme: dark) {
+  [data-brand="gpb"]:not([data-theme="light"]) .radar .dot.mid, [data-brand="gpb"]:not([data-theme="light"]) .radar .dot.new, [data-brand="gpb"]:not([data-theme="light"]) .radar-key .dk.mid { background: #2B4A8F; color: #fff; }
+}
+[data-brand="gpb"] .radar .dot.hi { border-color: var(--accent-2); }
+[data-brand="gpb"] .kpis .sw { border-color: var(--accent-2); }
+
+/* печать: те же синие ступени поясов, белые номера на синих точках */
+:root[data-brand="gpb"] .doc { --band-0: #C9D5FB; --band-1: #DCE4FD; --band-2: #EAEFFE; --band-3: #F6F8FF; }
+[data-brand="gpb"] .radar-print .pd.hi text { fill: #fff; }
+[data-brand="gpb"] .radar-print .pd.mid circle { fill: #C4E7FF; }
+[data-brand="gpb"] .doc .title .how { border-left-color: var(--accent); }

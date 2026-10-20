@@ -62,8 +62,8 @@ from dataclasses import dataclass
 import httpx
 
 from pelican.config import DATA_DIR, settings
-from pelican.store import Store
 from pelican.llm import LLMClient
+from pelican.store import Store
 from pelican.weak import asof
 
 BATCH = 12
@@ -135,6 +135,7 @@ async def _cores(labels: list[str]) -> list[str]:
         api_key=settings.llm_api_key,
         model=settings.llm_model,
         timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
     out: list[str] = []
     async with httpx.AsyncClient() as http:
@@ -183,12 +184,33 @@ _STOP = frozenset(
         "at",
         "into",
         "over",
+        "vs",
+        "versus",
     ]
 )
 
 
 def significant(name: str) -> list[str]:
+    """Значимые слова для СРАВНЕНИЯ имён (Жаккар, категории): от трёх символов."""
     return [w for w in re.findall(r"[a-z0-9+#-]{3,}", name.lower()) if w not in _STOP]
+
+
+def _loose_words(name: str) -> list[str]:
+    """Слова ярлыка для поиска по набору слов: без порога длины.
+
+    ⚠️ Не `significant`: индекс `simple` строился ради коротких токенов («ai», «5g», «ml»,
+    `schema.sql`), а порог в три символа выбрасывал их из запроса, и «ai security
+    platform» искалось как след всех платформ безопасности (PEL-D-04). Короткие токены —
+    первыми: это аббревиатуры, самое различительное в ярлыке, и отбор «самых длинных»
+    иначе вытеснял бы их у длинных ярлыков. ⚠️ Порядок — догадка, не замер.
+
+    Замер на 25 ярлыках истории с двухсимвольным токеном: «high performance computing for
+    ai» 9697 → 873 работ, «embedded edge ml» 1832 → 63, ушедшее — не про ИИ (топологии
+    сетей, графы). ⚠️ Цена: работа, где написано «artificial intelligence», а не «AI», в
+    след ярлыка с «ai» не входит — след ярлыка теперь скорее занижен, чем завышен.
+    """
+    words = list(dict.fromkeys(w for w in re.findall(r"[a-z0-9+#-]+", name.lower()) if w not in _STOP))
+    return sorted(words, key=lambda w: (len(w) > 3, -len(w)))
 
 
 #: Сколько значимых слов ярлыка участвует в совпадении. ⚠️ Догадка: берутся самые
@@ -227,17 +249,40 @@ def _match(name: str, loose: bool = False) -> str:
     («security» в «cybersecurity»).
     """
     low = name.lower()
-    words = significant(low)
+    words = _loose_words(low)
     if loose and len(words) > 1:
-        chosen = sorted(sorted(set(words), key=len, reverse=True)[:LOOSE_WORDS])
+        chosen = sorted(words[:LOOSE_WORDS])
         parts = [t for w in chosen for t in _tokens(w)]
-        return " & ".join(f"{t}:*" for t in parts)
+        # Двухсимвольный токен — целиком или во множественном числе, как короткое ядро:
+        # префикс `ai:*` нашёл бы «aim», «air», «aid». От трёх символов — префикс, как был.
+        return " & ".join(f"({t} | {t}s)" if len(t) <= 2 else f"{t}:*" for t in parts)
     toks = _tokens(low)
     if not toks:
         return ""
     if len(low) < SHORT_CORE and len(toks) == 1:
         return f"{toks[0]} | {toks[0]}s"
     return " <-> ".join(toks[:-1] + [f"{toks[-1]}:*"])
+
+
+def names_core(text: str, core: str) -> bool:
+    """Называет ли текст работы ядро — та же мера, что `_match` для ядра, но в Python.
+
+    ⚠️ Не подстрокой: ядро «ai» нашлось бы в «main» и «detail», «rag» — в «average», и
+    проверка «≥ 2 работ называют ядро» проходила бы у коротких ядер по построению
+    (PEL-E-04). Токены ядра подряд, последний — префиксом; короткое ядро — токен целиком
+    или его множественное число.
+    """
+    want = _tokens(core)
+    if not want:
+        return False
+    have = _tokens(text)
+    if len(core.strip()) < SHORT_CORE and len(want) == 1:
+        return want[0] in have or f"{want[0]}s" in have
+    n = len(want)
+    for i in range(len(have) - n + 1):
+        if have[i : i + n - 1] == want[:-1] and have[i + n - 1].startswith(want[-1]):
+            return True
+    return False
 
 
 #: След в корпусе, посчитанный раньше: имя и мера → числа. Корпус растёт медленно, а
@@ -257,7 +302,11 @@ CACHE_STAMP = DATA_DIR / "footprints.count"
 #: Доля роста корпуса, с которой кэш сбрасывается. ⚠️ Догадка: суточный сбор — ~0.02%,
 #: докачка одного тонкого месяца openalex (docs/todo.md §84) — ~1.5%.
 CACHE_DRIFT = 0.01
-_checked = False
+#: Как часто сверять штамп корпуса. ⚠️ Не раз за процесс: API живёт неделями, и проверка
+#: «один раз» отдавала след, замороженный на дату первого запроса (PEL-D-01). Пять минут —
+#: один `count(*)` на запрос `ask` (стадии следа идут внутри одного прогона подряд).
+CHECK_EVERY_S = 300.0
+_checked_at = 0.0
 #: Доля работ с компанией среди авторов — свой кэш с тем же ключом по срезу и тем же
 #: сбросом по штампу; формат `[с компанией, с институтами, ts]`.
 INDUSTRY_CACHE = DATA_DIR / "industry.json"
@@ -291,14 +340,20 @@ def _cache_check(store: Store) -> None:
 
 
 def _cache_load() -> dict[str, list]:
+    """Кэш следа без просроченных записей — на КАЖДОМ обращении, а не только при чтении
+    файла: иначе в долгоживущем процессе запись старше `CACHE_TTL_S` жила бы вечно, а
+    `_cache_save` продлевала бы её на диске."""
     global _cache
     if _cache is None:
         try:
-            payload = json.loads(CACHE.read_text(encoding="utf-8"))
-            fresh = time.time() - CACHE_TTL_S
-            _cache = {k: v for k, v in payload.items() if v[3] > fresh}
-        except (OSError, ValueError, TypeError, IndexError):
+            _cache = json.loads(CACHE.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
             _cache = {}
+    fresh = time.time() - CACHE_TTL_S
+    try:
+        _cache = {k: v for k, v in _cache.items() if v[3] > fresh}
+    except (TypeError, IndexError):
+        _cache = {}
     return _cache
 
 
@@ -358,14 +413,21 @@ def _scan(store: Store, specs: list[tuple[str, str]]) -> list[Footprint]:
     считаются ВМЕСТЕ: два отдельных вызова удваивали время запроса на ровном месте.
     ⚠️ 1 января выброшено из года первого появления: у openalex это заглушка вместо
     даты (docs/sources-science.md), и технология «появлялась» бы на год раньше.
+    ⚠️ Не наступить: год появления — МИНИМУМ, а не год, когда накоплено ≥ k работ
+    («emergence year» по порогу, Rotolo et al. 2015). Замер на 79 ядрах и 62 ярлыках
+    истории: порог min(3, 2 % следа) сдвигает год у 46 ядер, и всегда в сторону «моложе»
+    у заведомо зрелых (geothermal energy 2012 → 2020, cybersecurity 2009 → 2013, SLAM,
+    LoRa), у ярлыков — «retrieval-augmented code generation» 2020 → 2022. Ранние годы
+    корпуса тонкие (срезы openalex набирались от нового к старому), и одна старая работа
+    чаще настоящее свидетельство возраста, чем шум; порог делал зрелое молодым.
     """
     if not specs:
         return []
-    global _checked
-    if not _checked:
-        # Раз на процесс: один `count(*)` против штампа, дешевле любого следа.
+    global _checked_at
+    if time.time() - _checked_at > CHECK_EVERY_S:
+        # Один `count(*)` против штампа — дешевле любого следа.
         _cache_check(store)
-        _checked = True
+        _checked_at = time.time()
     known = _cache_load()
     # ⚠️ Ключ кэша несёт срез: те же слова на срезе 2024 дают ДРУГОЙ след, и общий ключ
     # отдал бы бэктесту сегодняшние числа (`weak.asof`).
@@ -489,6 +551,7 @@ def industry_share(store: Store, names: list[str], loose: bool = False) -> dict[
             pass
     out: dict[str, float | None] = {}
     for name, match in specs:
-        num, den, _ts = known[asof.key(match)]
+        # Тот же ключ, что при записи: под `SLICES` (бэктест) `asof.key` от него отличается.
+        num, den, _ts = known[_key(match)]
         out[name] = num / den if den >= INDUSTRY_MIN_WORKS else None
     return out

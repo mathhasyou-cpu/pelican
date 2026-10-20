@@ -15,7 +15,6 @@ import httpx
 import pytest
 from tenacity import wait_none
 
-from tests.conftest import fixture
 from pelican.sources import build_backfill
 from pelican.sources.arxiv import (
     MAX_WINDOW_DAYS,
@@ -39,6 +38,7 @@ from pelican.sources.openalex import (
     forecast,
     parse_works,
 )
+from tests.conftest import fixture
 
 # ------------------------------------------------------------------- arxiv
 
@@ -69,11 +69,29 @@ def test_parse_entries_extracts_signals() -> None:
 
 
 def test_external_id_keeps_the_version() -> None:
-    """v1 и v2 — разные подачи с разными датами, и схлопывать их нельзя."""
+    """Версия в ключе — ради совместимости id; дубли версий режет вставка (PEL-J-02)."""
     ids = [s.external_id for s in parse_entries(fixture("arxiv_query.xml"))]
 
     assert all("/" not in i for i in ids)
     assert any(i[-2:].startswith("v") for i in ids)
+
+
+def test_second_version_of_a_preprint_is_not_a_second_work(store) -> None:
+    """v2 с той же датой, что v1, в корпус второй строкой не идёт — ни из базы, ни из пачки."""
+    from datetime import UTC, datetime
+
+    from pelican.sources.base import Signal
+
+    when = datetime(2026, 9, 7, 17, 0, tzinfo=UTC)
+
+    def sig(ext: str) -> Signal:
+        return Signal("arxiv", ext, "A preprint about things " * 5, when, "submissions", None,
+                      url=f"https://arxiv.org/abs/{ext}")
+
+    assert store.insert_signals([sig("2609.07664v1")]) == 1
+    assert store.insert_signals([sig("2609.07664v2"), sig("2609.07700v2"), sig("2609.07700v1")]) == 1
+    urls = sorted(r[0] for r in store.conn.execute("SELECT url FROM works").fetchall())
+    assert urls == ["https://arxiv.org/abs/2609.07664v1", "https://arxiv.org/abs/2609.07700v1"]
 
 
 def test_old_style_ids_keep_their_archive() -> None:
@@ -242,6 +260,27 @@ def test_openalex_refuses_to_truncate_a_day(monkeypatch: pytest.MonkeyPatch) -> 
                 None, "primary_topic.field.id:fields/25", date(2026, 1, 1), date(2026, 1, 1)
             )
         )
+
+
+def test_openalex_budget_on_one_slice_keeps_the_other_slices(monkeypatch: pytest.MonkeyPatch) -> None:
+    """429 на одном срезе окна не выбрасывает оплаченные страницы соседних (PEL-J-03)."""
+    from pelican.sources.base import PartialFetch
+
+    async def window(self, http, scope, lo, hi):  # noqa: ANN001, ANN202
+        if scope == "b":
+            raise RuntimeError("OpenAlex 429: бюджет исчерпан")
+        return [f"работа {scope}"]
+
+    monkeypatch.setattr(OpenAlex, "_fetch_window", window)
+    source = OpenAlex(filters=["a", "b", "c"], lookback=timedelta(days=1))
+
+    async def go():
+        return [chunk async for chunk in source.fetch_stream()]
+
+    with pytest.raises(PartialFetch) as got:
+        asyncio.run(go())
+    assert sorted(got.value.signals) == ["работа a", "работа c"]
+    assert "1 из 3 срезов" in str(got.value)
 
 
 def test_openalex_takes_a_dense_day_whole(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>АС ПЕЛИКАН</title>
+<meta name="description" content="АС ПЕЛИКАН — радар слабых сигналов: запрос, живой прогресс с радаром, отчёт радаром и столом, вся история, отчёт для печати и PDF, ссылка на отчёт.">
+<!-- Веб-интерфейс АС ПЕЛИКАН: React, сборка Vite (src/main.jsx). Данные — `pelican.api` на
+     том же адресе (/api/…). Маршруты — в src/App.jsx. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=TikTok+Sans:opsz,wdth,wght@12..36,75..150,300..900&display=swap" rel="stylesheet">
+<script>
+  /* Оформление до первой отрисовки, без вспышки: ?brand=gpb|pelican и ?theme=light|dark
+     запоминаются, иначе — запомненное (тема без него — системная). */
+  (function () {
+    var m = /[?&]brand=(gpb|pelican)/.exec(location.search), b = m ? m[1] : null;
+    var n = /[?&]theme=(light|dark)/.exec(location.search), t = n ? n[1] : null;
+    try {
+      if (b) localStorage.setItem("pelican-brand", b); else b = localStorage.getItem("pelican-brand");
+      if (t) localStorage.setItem("pelican-theme", t); else t = localStorage.getItem("pelican-theme");
+    } catch (e) { /* приватное окно */ }
+    if (b === "gpb") document.documentElement.setAttribute("data-brand", "gpb");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  })();
+  /* Заставка — раз за сессию вкладки, и решается ДО первой отрисовки: класс `splashing`
+     прячет экран, пока её не покажет и не уберёт components/Splash.jsx. Иначе готовый отчёт
+     успевал мелькнуть до неё. По прямой ссылке на отчёт или ожидание — короткий вариант. */
+  (function () {
+    var seen = false;
+    try { seen = sessionStorage.getItem("pelican-splash") === "1"; sessionStorage.setItem("pelican-splash", "1"); } catch (e) { /* приватное окно */ }
+    if (seen) return;
+    var h = document.documentElement;
+    h.classList.add("splashing");
+    if (/^#(report|job)=/.test(location.hash)) h.classList.add("splash-short");
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .env
+data/
+*.pkl
+.idea/
 logs/
 .pytest_cache/
 .ruff_cache/
@@ -16,4 +19,17 @@ reports/*
 !reports/weak-model-zoo.md
 !reports/weak-growth-holdout.md
 !reports/weak-growth-holdout.in-query.money-pool-to-*.md
-bash.exe.stackdump
+# Валидация модели роста, которую цитирует страница выдачи, и её входы: без них числа
+# holdout не пересчитать из репозитория (PEL-G-05). Это сотни строк, не сырые прогоны.
+!reports/weak-growth-holdout.in-query.pool-to-*.md
+!reports/weak-growth-holdout.in-query.pool-to-*.json
+!reports/bt-*/
+reports/bt-*/*
+!reports/bt-*/backtest.tsv
+!reports/bt-*/backtest.json
+!reports/bt-*/backtest-classifier.tsv
+!reports/bt-*/backtest-classifier.json
+*.stackdump
+# Веб-интерфейс: зависимости и сборка (`npm ci && npm run build` в web/, в образе — своя стадия).
+web/node_modules/
+web/dist/

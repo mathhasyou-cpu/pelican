@@ -1,0 +1,125 @@
+@startuml uc-03-pipeline
+' UC-03 Обработать запрос из очереди: стадии конвейера weak.ask.run и события.
+' Источник: src/pelican/events.py RUN_STAGES, docs/techdoc.md §5, api.Worker._run.
+' Времена — холодный прогон на стенде (техдока §5); бюджет BUDGET_S = 1100 с, CARDS_RESERVE_S = 260 с.
+' Ветки WEAK_LAYERS / WEAK_EXTRA_SOURCES — флаги, на стенде включены (OQ-17).
+skinparam shadowing false
+
+|Исполнитель (api.Worker)|
+start
+:claim(): queued → running;
+:захватить замок модели (runner.MODEL_LOCK);
+|Конвейер (weak.ask.run)|
+:1. expand — раскрыть запрос
+~11–17 с;
+note right
+  emit stage{expand}
+  emit facets{facets_ru, facets_en,
+    submarkets, query_en}
+end note
+:2. science — научный поток
+30 работ × ~6 фасетов, разметка приёмов,
+сведение вариантов (0.78)
+1–2 мин;
+note right
+  emit stage{science}
+  emit counts{works, works_named}
+end note
+:3. money — денежный поток
+380–450 заголовков, 65–80 направлений,
+компании сверены с текстом
+3–4 мин;
+note right
+  emit stage{money}
+  emit counts{headlines, directions}
+end note
+:4. merge — сведение к ядру,
+близнецы, снятие категорий
+→ до 45 кандидатов, ~40 с;
+note right
+  emit stage{merge}
+  emit counts{candidates,
+    categories_removed, categories}
+  назначить facet каждому кандидату
+end note
+:5. evidence — след в корпусе,
+живой поиск (кэш суток), компании
+~3 мин;
+note right
+  emit stage{evidence}
+  отказ источника → live_errors,
+  прогон продолжается
+end note
+:6. assess — класс зрелости,
+стадия (выбор модели), 12 чтений
+(из них 3 вехи стадии) — по кандидату
+~170 с;
+note right
+  emit stage{assess}
+  emit verdict{label, title, kind,
+    kind_label, stage, why, companies,
+    stream, facet, sources} × кандидат
+  сбой оценки → verdict kind=error
+end note
+:7. score — модель роста,
+порядок ТОП; соответствие запросу
+по порядку, пока не наберётся 15;
+note right
+  emit stage{score}
+  emit relevance{label, relevance,
+    relevance_why} × проверенный
+  emit top{labels, confidence}
+  WEAK_LAYERS: stage{patents} и патенты
+  (+ WEAK_EXTRA_SOURCES) на весь пул слоёв
+  до top, без срока бюджета — расходится
+  с BR-33 (07 §8.6); шаг 8 тогда пропущен
+end note
+:8. patents — EPO OPS по 15 финалистам
+до срока «бюджет − резерв карточек»
+~3.5 мин; WEAK_EXTRA_SOURCES — NIH,
+Europe PMC, ClinicalTrials.gov, YC (без срока);
+note right
+  emit stage{patents}
+  emit patents{patents: {label: n}}
+  не успели до срока → в live_errors
+end note
+:9. cards — emit stage{cards};
+if (до резерва карточек ≥ DEEPEN_MIN_S?) then (да)
+  :углубление ТОП: аннотации
+  arXiv/OpenAlex, фактовые заголовки;
+else (нет)
+  :live_errors["deepen"] —
+  исчерпан бюджет времени;
+endif
+:стадия выдачи — лестница вех
+(rubric.evidence_stage, BR-15),
+выбор модели остаётся её признаком;
+:карточки по-русски, цитата-подтверждение,
+гипотеза, резюме источников ~3 мин;
+note right
+  emit card{label, title, stage,
+    description, advantage, case,
+    hypothesis} × сигнал
+  emit titles{titles} — исключённые,
+    вне ТОП, наблюдать и ТОП без
+    русского названия (latin_top)
+end note
+:модели ответа в result.models;
+|Исполнитель (api.Worker)|
+:emit stage{save};
+:save_report(name = время старта,
+JSON, HTML, summary);
+:finish(): running → done;
+:emit done{report};
+stop
+
+legend bottom
+  Поток исключений (любая стадия): исключение или SystemExit →
+  error = failure.explain(exc), error_detail = «тип: текст» →
+  fail(): running → failed → emit failed{error, error_detail}.
+  Сбой записи события или строки прогресса прогон не роняет (BR-43).
+  Отмена (FEAT-41): на каждом emit stage, кроме save, исполнитель читает флаг
+  jobs.cancel; поднят → jobs.Cancelled → jobs.cancelled(): running → cancelled;
+  события отмены нет, замок модели освобождается, отчёт не пишется.
+endlegend
+@enduml

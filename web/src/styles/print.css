@@ -1,0 +1,135 @@
+/* Pelican UI v2 — печатный отчёт (print.html) на системе styles/system.css. A4, поля 15 мм; кегли в pt: 8 / 10 / 13 / 16 / 26.
+   На экране — листы на сером столе с панелью «Сохранить PDF»; при печати — те же листы без стола. */
+
+/* Отказы источников и пояснение недобора ТОП (components/RunNotes.jsx) на титуле. */
+.doc .runline { margin: 4mm 0 0; font-size: 8.5pt; color: var(--muted); }
+.doc .runline .no b { color: var(--ink); }
+.doc .shortfall { margin: 4mm 0 0; padding: 2.5mm 3.5mm; border-left: 0.8mm solid var(--accent); background: var(--surface-2); font-size: 9pt; line-height: 1.45; }
+
+@page {
+  size: A4;
+  margin: 18mm 15mm 16mm;
+  @top-left { font-family: "TikTok Sans", sans-serif; font-size: 8pt; color: #5F646A; }
+  @top-right { font-family: "TikTok Sans", sans-serif; font-variant-numeric: tabular-nums; font-size: 8pt; color: #5F646A; }
+  @bottom-left { font-family: "TikTok Sans", sans-serif; font-size: 8pt; color: #5F646A; }
+  @bottom-right { font-family: "TikTok Sans", sans-serif; font-variant-numeric: tabular-nums; font-size: 8pt; color: #5F646A; }
+}
+
+html { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+/* лист белый: серая бумага экрана на печати тратит тонер */
+.doc { --bg: #FFFFFF; --surface: #FFFFFF; --surface-2: #F3F4F1; --surface-3: #E9EAE6; --line: #DCDED9; --line-2: #B9BDB7;
+  --band-0: #CDD0CA; --band-1: #DADCD6; --band-2: #E6E8E3; --band-3: #F3F4F1;
+  /* имена, которыми написаны правила ниже */
+  --paper: var(--surface); --panel: var(--surface-2); --panel-2: var(--surface-3); --hair: var(--line); --hair-2: var(--line-2);
+  --mark: var(--accent); --mark-soft: var(--accent-soft); }
+body.doc { background: #D2D5CF; font-size: 10pt; line-height: 1.5; }
+
+/* экран: панель и листы */
+.doc .toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-3) var(--sp-5); background: #111316; color: #EDEEEA; font-size: var(--fs-sm); }
+.doc .toolbar a { color: #EDEEEA; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.doc .toolbar .ic { width: 18px; height: 18px; }
+.doc .toolbar a:hover { text-decoration: underline; }
+.doc .toolbar .btn { border-color: var(--mark); background: var(--mark); color: #15171A; }
+.doc .toolbar .btn:hover { background: #F8E2A0; }
+.doc .toolbar .note { color: #AEB2AC; }
+.doc .toolbar .grow { flex: 1; }
+.doc main { padding: var(--sp-5) 0 var(--sp-20); }
+.doc .page { width: 210mm; min-height: 297mm; margin: var(--sp-5) auto; padding: 18mm 15mm 16mm; background: var(--paper); border-radius: 4px; box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 12px 32px -12px rgb(0 0 0 / .25); }
+
+/* типографика листа */
+.doc h1 { font-size: 28pt; line-height: 1.08; font-weight: 600; letter-spacing: -0.02em; }
+.doc .ph { font-size: 16pt; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; padding-bottom: 3mm; margin-bottom: 6mm; border-bottom: 1.5px solid var(--ink); display: flex; justify-content: space-between; align-items: baseline; gap: 5mm; }
+.doc .ph small { font-size: 8pt; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+.doc .lead { font-size: 13pt; line-height: 1.45; color: var(--ink-2); margin-top: 5mm; max-width: 150mm; }
+.doc .muted { color: var(--muted); }
+.doc .chip { font-size: 8pt; height: auto; padding: 1mm 2.5mm 1mm 2mm; gap: 1.5mm; }
+.doc .chip .lt { width: 4mm; height: 4mm; border-radius: 50%; font-size: 6.5pt; margin-left: -1mm; }
+.doc table { font-size: 9pt; }
+.doc th { font-size: 8pt; height: auto; padding: 1.5mm 2mm; }
+.doc td { height: auto; padding: 2mm; vertical-align: top; }
+
+/* титул */
+.doc .title { display: flex; flex-direction: column; justify-content: space-between; min-height: 263mm; }
+.doc .title .brandline { display: flex; flex-direction: column; align-items: flex-start; gap: 2.5mm; font-size: 9pt; line-height: 1.3; font-stretch: var(--narrow); }
+.doc .title .brandline .wm { font-size: 18pt; color: var(--ink); }
+.doc .title .tmain { margin: 21mm 0; }
+.doc .title .kicker { font-size: 10pt; color: var(--muted); margin-bottom: 3mm; }
+.doc .title .chips { margin-top: 6mm; }
+.doc .title .meta { display: grid; grid-template-columns: 38mm 1fr; gap: 1.5mm 5mm; font-size: 9pt; padding-top: 5mm; border-top: 1px solid var(--hair-2); }
+.doc .title .meta dt { color: var(--muted); }
+.doc .title .meta dd { margin: 0; }
+.doc .title .how { margin-top: 8mm; padding: 5mm 6mm; background: var(--panel); border-left: 2px solid var(--mark); }
+.doc .title .how h2 { font-size: 10pt; font-weight: 500; margin-bottom: 2mm; }
+.doc .title .how li { font-size: 9pt; line-height: 1.45; padding: 0.6mm 0; list-style: decimal; margin-left: 5mm; }
+
+/* радар */
+.doc .radar-print { display: block; width: 100%; max-width: 176mm; margin: 0 auto; }
+.radar-print .pd circle { stroke: var(--ink); stroke-width: .19; fill: var(--paper); }
+.radar-print .pd.hi circle { fill: var(--mark); }
+.radar-print .pd.mid circle { fill: var(--mark-soft); }
+.radar-print .pd.thin circle { fill: none; stroke-dasharray: .5 .4; }
+.radar-print .pd.out circle { fill: var(--cut); stroke: none; }
+.radar-print .pd text { font-family: var(--sans); font-weight: 600; text-anchor: middle; fill: var(--ink); }
+.radar-print .fl { cursor: default; }
+.radar-print .rl.o { stroke: var(--paper); }
+.doc .radar-key { font-size: 8pt; margin-top: 4mm; padding-top: 3mm; gap: 3mm 8mm; }
+.doc .pindex { margin-top: 5mm; columns: 2; column-gap: 8mm; font-size: 8.5pt; }
+.doc .pindex li { display: grid; grid-template-columns: 6mm 1fr auto; gap: 2mm; padding: 1mm 0; border-bottom: 1px solid var(--hair); break-inside: avoid; }
+.doc .pindex .n, .doc .pindex .c { color: var(--muted); }
+.doc .pindex .n { text-align: right; }
+
+/* стол */
+.doc .ptable .n { color: var(--muted); width: 8mm; }
+.doc .ptable .ttl { font-weight: 500; }
+.doc .ptable .lab { font-size: 8pt; font-stretch: var(--narrow); color: var(--muted); }
+.doc .ptable .cf { width: 30mm; }
+.doc .ptable .cf div { display: grid; grid-template-columns: 11mm 1fr; gap: 2mm; align-items: center; }
+.doc .ptable tr { break-inside: avoid; }
+.doc .ptable td { padding: 1.4mm 2mm; font-size: 8.5pt; line-height: 1.35; }
+.doc .method table td { padding: 1mm 2mm; font-size: 8.5pt; }
+.doc .method .checks li { font-size: 8.5pt; }
+
+/* карточки: по одной на лист */
+.doc .cardpage .cardno { font-size: 8pt; color: var(--muted); margin-bottom: 3mm; display: flex; justify-content: space-between; }
+/* карточка на листе — в две колонки, шапка и источники на всю ширину: сигнал целиком на одном A4 */
+.doc .cardpage .card { padding: 0; columns: 2; column-gap: 8mm; column-fill: auto; }
+.doc .cardpage .card header { column-span: all; border-bottom: 1.5px solid var(--ink); margin-bottom: 2mm; }
+.doc .cardpage .card section:last-of-type { column-span: all; border-top: 1px solid var(--hair-2); margin-top: 2mm; break-inside: auto; }
+.doc .card .srcs tr { break-inside: avoid; }
+.doc .card h2.t26 { font-size: 16pt; }
+.doc .card .lab, .doc .card h3 { font-size: 7.5pt; }
+.doc .card h3 { margin-bottom: 1mm; }
+.doc .card p, .doc .card li { font-size: 8.5pt; line-height: 1.42; }
+.doc .card .preds li, .doc .card .checks li, .doc .card .facts li, .doc .card .assess li { font-size: 8pt; line-height: 1.38; }
+.doc .card section { break-inside: avoid; padding: 1.1mm 0; }
+.doc .card .srcs td, .doc .card .srcs th { font-size: 7pt; line-height: 1.3; padding: 0.8mm 2mm 0.8mm 0; }
+.doc .card .srcs a { text-decoration: none; }
+/* экранные размеры карточки из system.css — к печатным */
+.doc .card header { padding-bottom: 2mm; }
+.doc .card header .lab { font-size: 7pt; margin-top: 1mm; }
+.doc .card header .row { margin-top: 2mm; gap: 1.5mm; }
+.doc .card header .chip, .doc .card .stamp, .doc .card .chips .chip.solid { height: auto; font-size: 7.5pt; padding: .7mm 2.2mm; }
+.doc .card .checks li { padding: .5mm 0; }
+.doc .card .srcs .pub { font-size: 7pt; }
+.doc .card blockquote { margin-top: 1.5mm; padding: 1.2mm 3mm; }
+.doc .card .conf .mono { font-size: 13pt; }
+.doc .card .facts li { grid-template-columns: 17mm 1fr; }
+.doc .card .facts time { font-size: 7pt; white-space: nowrap; }
+.doc .card blockquote { font-size: 8.5pt; }
+
+/* приложение и методика */
+.doc .appx h3 { font-size: 10pt; font-weight: 600; margin: 6mm 0 2mm; }
+.doc .appx td { font-size: 8.5pt; }
+.doc .appx .why { color: var(--ink-2); }
+.doc .method p { font-size: 9.5pt; max-width: 165mm; margin-bottom: 3mm; }
+.doc .method h3 { font-size: 10pt; font-weight: 600; margin: 6mm 0 2mm; }
+
+@media print {
+  body.doc { background: none; }
+  .doc .toolbar { display: none; }
+  .doc main { padding: 0; }
+  .doc .page { width: auto; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; break-after: page; }
+  .doc .page:last-child { break-after: auto; }
+  .doc .title { min-height: 255mm; }
+  .doc a { color: inherit; }
+}

@@ -187,7 +187,11 @@ def load(folder: Path) -> tuple[date, list[dict]]:
         r["before"] = int(b["работ на срезе"])
         r["after_2y_tsv"] = int(b["работ после"])
         r["срез"] = cut.isoformat()
-    return cut, rows
+    # Тонкая база — исход роста не определён (`backtest_signals.MIN_BASE`, PEL-G-06): иначе
+    # «рост сверх медианы домена» под тонкими срезами мерил «появилась ли работа».
+    thick = [r for r in rows if r["before"] >= backtest_signals.MIN_BASE]
+    print(f"{folder.name}: без исхода (база < {backtest_signals.MIN_BASE}) {len(rows) - len(thick)} из {len(rows)}")
+    return cut, thick
 
 
 def measure(rows: list[dict], title: str) -> dict:
@@ -249,7 +253,7 @@ def main() -> None:
             ours = [r["before"] + r["grown"][-1] for r in rows]
             theirs = [r["after_2y_tsv"] for r in rows]
             print(f"  сверка 2 лет с backtest.tsv: ρ Спирмена {spearman(ours, theirs):.3f}, "
-                  f"наш прирост / их: {sum(o - r['before'] for o, r in zip(ours, rows)) / max(sum(t - r['before'] for t, r in zip(theirs, rows)), 1):.2f}")
+                  f"наш прирост / их: {sum(o - r['before'] for o, r in zip(ours, rows, strict=True)) / max(sum(t - r['before'] for t, r in zip(theirs, rows, strict=True)), 1):.2f}")
             per_cut[cut.isoformat()] = measure(rows, f"срез {cut}")
             pooled += rows
     core_mod.SLICES = None

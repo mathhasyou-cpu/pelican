@@ -74,6 +74,7 @@ async def _translate(names: list[str]) -> list[Translation]:
         api_key=settings.llm_api_key,
         model=settings.llm_model,
         timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
     out: list[Translation] = []
     async with httpx.AsyncClient() as http:

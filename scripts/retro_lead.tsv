@@ -1,0 +1,22 @@
+tech	aliases	cut	query	domain	why
+Трансформеры +12	transformer|self-attention|attention is all you need|multi-head attention	2018-06-01	технологии в ИИ	ИИ	Vaswani et al., arXiv:1706.03762 (июнь 2017); бум — GPT-2 и BERT, 2019
+Диффузионные модели +12	diffusion model|denoising diffusion|score-based generative|score matching	2021-06-01	технологии в ИИ	ИИ	Ho et al., arXiv:2006.11239 (июнь 2020); бум — DALL-E 2 и Stable Diffusion, 2022
+Vision Transformer +12	vision transformer|vit|image transformer	2021-10-01	технологии в ИИ	ИИ	Dosovitskiy et al., arXiv:2010.11929 (октябрь 2020); бум — 2021–2022
+Генерация с поиском (RAG) +12	retrieval-augmented|retrieval augmented generation|retrieval-enhanced	2021-05-01	технологии в ИИ	ИИ	Lewis et al., arXiv:2005.11401 (май 2020); бум — 2023
+Обучение по обратной связи человека (RLHF) +12	human feedback|rlhf|preference learning|reward model	2021-09-01	технологии в ИИ	ИИ	Stiennon et al., arXiv:2009.01325 (сентябрь 2020); бум — ChatGPT, ноябрь 2022
+Низкоранговая адаптация (LoRA) +12	low-rank adaptation|lora|parameter-efficient fine-tuning|adapter	2022-06-01	технологии в ИИ	ИИ	Hu et al., arXiv:2106.09685 (июнь 2021); бум — 2023
+Цепочка рассуждений (chain-of-thought) +12	chain-of-thought|chain of thought|step-by-step reasoning	2023-01-01	технологии в ИИ	ИИ	Wei et al., arXiv:2201.11903 (январь 2022); бум — 2023
+Трансформеры +18	transformer|self-attention|attention is all you need|multi-head attention	2018-12-01	технологии в ИИ	ИИ	Vaswani et al., arXiv:1706.03762 (июнь 2017); бум — GPT-2 и BERT, 2019
+Диффузионные модели +18	diffusion model|denoising diffusion|score-based generative|score matching	2021-12-01	технологии в ИИ	ИИ	Ho et al., arXiv:2006.11239 (июнь 2020); бум — DALL-E 2 и Stable Diffusion, 2022
+Vision Transformer +18	vision transformer|vit|image transformer	2022-04-01	технологии в ИИ	ИИ	Dosovitskiy et al., arXiv:2010.11929 (октябрь 2020); бум — 2021–2022
+Генерация с поиском (RAG) +18	retrieval-augmented|retrieval augmented generation|retrieval-enhanced	2021-11-01	технологии в ИИ	ИИ	Lewis et al., arXiv:2005.11401 (май 2020); бум — 2023
+Обучение по обратной связи человека (RLHF) +18	human feedback|rlhf|preference learning|reward model	2022-03-01	технологии в ИИ	ИИ	Stiennon et al., arXiv:2009.01325 (сентябрь 2020); бум — ChatGPT, ноябрь 2022
+Низкоранговая адаптация (LoRA) +18	low-rank adaptation|lora|parameter-efficient fine-tuning|adapter	2022-12-01	технологии в ИИ	ИИ	Hu et al., arXiv:2106.09685 (июнь 2021); бум — 2023
+Цепочка рассуждений (chain-of-thought) +18	chain-of-thought|chain of thought|step-by-step reasoning	2023-07-01	технологии в ИИ	ИИ	Wei et al., arXiv:2201.11903 (январь 2022); бум — 2023
+Трансформеры +6	transformer|self-attention|attention is all you need|multi-head attention	2017-12-01	технологии в ИИ	ИИ	Vaswani et al., arXiv:1706.03762 (июнь 2017); бум — GPT-2 и BERT, 2019
+Диффузионные модели +6	diffusion model|denoising diffusion|score-based generative|score matching	2020-12-01	технологии в ИИ	ИИ	Ho et al., arXiv:2006.11239 (июнь 2020); бум — DALL-E 2 и Stable Diffusion, 2022
+Vision Transformer +6	vision transformer|vit|image transformer	2021-04-01	технологии в ИИ	ИИ	Dosovitskiy et al., arXiv:2010.11929 (октябрь 2020); бум — 2021–2022
+Генерация с поиском (RAG) +6	retrieval-augmented|retrieval augmented generation|retrieval-enhanced	2020-11-01	технологии в ИИ	ИИ	Lewis et al., arXiv:2005.11401 (май 2020); бум — 2023
+Обучение по обратной связи человека (RLHF) +6	human feedback|rlhf|preference learning|reward model	2021-03-01	технологии в ИИ	ИИ	Stiennon et al., arXiv:2009.01325 (сентябрь 2020); бум — ChatGPT, ноябрь 2022
+Низкоранговая адаптация (LoRA) +6	low-rank adaptation|lora|parameter-efficient fine-tuning|adapter	2021-12-01	технологии в ИИ	ИИ	Hu et al., arXiv:2106.09685 (июнь 2021); бум — 2023
+Цепочка рассуждений (chain-of-thought) +6	chain-of-thought|chain of thought|step-by-step reasoning	2022-07-01	технологии в ИИ	ИИ	Wei et al., arXiv:2201.11903 (январь 2022); бум — 2023

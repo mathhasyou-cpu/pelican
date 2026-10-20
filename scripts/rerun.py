@@ -53,12 +53,12 @@ def main() -> None:
         with locks.hold(MODEL_LOCK), Store(settings.storage_target) as store:
             result = run_ask(store, row["query"], on_progress=lambda m: print(f"  · {m}"))
         with jobs.connect(settings.database_url) as conn:
-            past = [
-                r["result"]
-                for r in jobs.reports(conn, limit=500)
-                if r["name"] != name and r["started"] < row["started"]
-            ]
-            history.annotate(result, history.prior_runs(past, row["query"], result.started))
+            # Только метки того же запроса (`jobs.history`, PEL-I-05); прогон, начатый не
+            # раньше пересобираемого, `prior_runs` отсекает сам.
+            past = jobs.history(conn, row["query"])
+            # Граница — старт ПЕРЕСОБИРАЕМОГО отчёта: сам он и всё, что после, — не прошлое.
+            since = str(row["result"].get("started") or result.started)
+            history.annotate(result, history.prior_runs(past, row["query"], since))
             html, payload = page.render(result), page.to_json(result)
             jobs.save_report(conn, name, row["query"], row["started"], payload, html)
         labels = " · ".join(s.label for s in result.signals) or "пусто"
@@ -66,4 +66,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Исполнитель API держит замок `model` на время задания: «занято» — код 75, как у
+    # `measure_ask`, а не трассировка.
+    try:
+        main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

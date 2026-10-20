@@ -127,7 +127,7 @@ def test_shipped_growth_params_match_feature_contract() -> None:
         [{"core_last_year_share": 0.8, "core_works": 30, "players": 3, "money_stream": 0}]
     )[0]
     got = model.probability(feats, params)
-    assert 0.0 < got.probability < 1.0 and len(got.predictors) == 3
+    assert 0.0 < got.probability < 1.0 and len(got.predictors) == min(3, len(names))
 
 
 def test_query_features_are_relative_to_the_query() -> None:
@@ -141,9 +141,16 @@ def test_query_features_are_relative_to_the_query() -> None:
     # Крошечное ядро со 100% свежих сжато к медиане пула (0.9), большое — почти не сдвинуто.
     assert 0.9 <= f[1]["query_share"] < 0.92
     assert abs(f[0]["query_share"] - 0.9) < 1e-9
-    # Нечем измерить — в хвост; перцентиль внутри пула.
-    assert f[3]["query_share"] == -1.0 and f[3]["query_share_pct"] == 0.25
-    assert f[1]["query_share_pct"] == 1.0 and f[2]["query_share_pct"] == 0.5
+    # Нечем измерить — пропуск и индикатор, а не «−1» в нормировке (PEL-F-01); сглаженный
+    # перцентиль `(r − 0.5) / n` — только по трём измеренным.
+    assert f[3]["query_share"] is None and f[3]["query_share_pct"] is None
+    assert [x["share_missing"] for x in f] == [0.0, 0.0, 0.0, 1.0]
+    assert f[2]["query_share_pct"] == pytest.approx(0.5 / 3)
+    assert f[0]["query_share_pct"] == pytest.approx(1.5 / 3)
+    assert f[1]["query_share_pct"] == pytest.approx(2.5 / 3)
+    # Ничьи — средний ранг.
+    tie = model.query_features([{"core_last_year_share": 0.5, "core_works": 10}] * 2)
+    assert [x["query_share_pct"] for x in tie] == [0.5, 0.5]
     # Деньги или хотя бы один игрок; премия за игроков с потолком.
     assert [x["backed"] for x in f] == [1.0, 1.0, 0.0, 1.0]
     assert f[0]["players_cap"] == model.PLAYERS_CAP

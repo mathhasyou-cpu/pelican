@@ -38,7 +38,7 @@ def test_footprints_count_in_postgres(store, tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(core, "CACHE", tmp_path / "footprints.json")
     monkeypatch.setattr(core, "CACHE_STAMP", tmp_path / "footprints.count")
     monkeypatch.setattr(core, "_cache", None)
-    monkeypatch.setattr(core, "_checked", False)
+    monkeypatch.setattr(core, "_checked_at", 0.0)
     works = [
         (1, "arxiv", "Federated learning at the edge", datetime(2019, 5, 1)),
         (2, "openalex", "Personalised federated learnings for health", datetime(2021, 3, 1)),
@@ -114,6 +114,31 @@ def test_footprint_cache_resets_only_when_corpus_grows_past_drift(tmp_path, monk
     assert not cache.exists() and stamp.read_text(encoding="utf-8") == "1020000"
 
 
+def test_footprint_cache_ttl_holds_inside_one_process(tmp_path, monkeypatch) -> None:
+    """Просроченная запись уходит и в долгоживущем процессе, а не только при новом чтении
+    файла; штамп корпуса сверяется снова через `CHECK_EVERY_S` (PEL-D-01)."""
+    from pelican.weak import core
+
+    clock = {"t": 1_000_000.0}
+    monkeypatch.setattr(core.time, "time", lambda: clock["t"])
+    monkeypatch.setattr(core, "CACHE", tmp_path / "footprints.json")
+    monkeypatch.setattr(core, "_cache", {"old": [1, 2020, 1, clock["t"]]})
+    assert "old" in core._cache_load()
+    clock["t"] += core.CACHE_TTL_S + 1
+    assert "old" not in core._cache_load()
+
+    checks = []
+    monkeypatch.setattr(core, "_cache_check", lambda store: checks.append(clock["t"]))
+    monkeypatch.setattr(core, "_checked_at", 0.0)
+    core._scan(None, [])  # пустой список — без обращения к базе
+    monkeypatch.setattr(core, "_cache", {"k": [1, 2020, 1, clock["t"]]})
+    monkeypatch.setattr(core, "_key", lambda m: "k")
+    core._scan(None, [("x", "x")])
+    clock["t"] += core.CHECK_EVERY_S + 1
+    core._scan(None, [("x", "x")])
+    assert len(checks) == 2
+
+
 def test_industry_share_fails_loudly_without_institutions(store, monkeypatch) -> None:
     """Институты авторов в `works` не перелиты: признак падает, а не отдаёт тихий `None`
     (модель, которая его берёт, иначе стала бы молча другой)."""
@@ -141,3 +166,16 @@ def test_slices_narrow_the_scan_and_the_cache_key(monkeypatch) -> None:
     assert core._key("m") != asof.key("m")
     monkeypatch.setattr(core, "SLICES", frozenset({"Energy"}))
     assert core._key("m") != core._key("n")
+
+
+def test_names_core_by_tokens_not_substring() -> None:
+    """«ai» не находится в «main», «rag» — в «average» (PEL-E-04)."""
+    from pelican.weak.core import names_core
+
+    assert not names_core("The main detail of this paper", "ai")
+    assert names_core("Secure AI agents for the enterprise", "AI")
+    assert not names_core("an average storage layer", "rag")
+    assert names_core("RAGs over private corpora", "rag")
+    assert names_core("Federated learnings at scale", "federated learning")
+    assert not names_core("learning federated models", "federated learning")
+    assert not names_core("anything", "")

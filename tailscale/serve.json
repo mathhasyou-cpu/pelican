@@ -2,7 +2,9 @@
   "TCP": { "443": { "HTTPS": true } },
   "Web": {
     "${TS_CERT_DOMAIN}:443": {
-      "Handlers": { "/": { "Proxy": "http://ui:8501" } }
+      "Handlers": {
+        "/": { "Proxy": "http://api:8010" }
+      }
     }
   },
   "AllowFunnel": { "${TS_CERT_DOMAIN}:443": true }

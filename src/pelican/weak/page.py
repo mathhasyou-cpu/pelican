@@ -27,7 +27,7 @@ from typing import Any
 from pelican.weak.ask import AskResult, Check, Signal, Source
 from pelican.weak.card import drop_foreign, foreign_script
 from pelican.weak.kinds import LABELS as KIND_LABELS
-from pelican.weak.rubric import STAGE_LABELS, stage_floor
+from pelican.weak.rubric import STAGE_LABELS, evidence_stage
 
 _CSS = """
 :root{--bg:#fafaf7;--fg:#1c1d22;--muted:#6b6b76;--line:#e3e1da;--card:#fff;
@@ -58,7 +58,7 @@ details.card[open]>summary{border-bottom:1px solid var(--line)}
 .chip{display:inline-block;background:var(--chip);border-radius:999px;padding:1px 9px;
 font-size:12px;margin:0 4px 4px 0;font-weight:500;max-width:100%;overflow-wrap:anywhere}
 .ok{color:var(--good)}.no{color:var(--bad)}.lvl-high{color:var(--good)}.lvl-medium{color:var(--mid)}
-.lvl-low{color:var(--bad)}.bar{display:inline-block;height:8px;border-radius:4px;
+.lvl-low{color:var(--bad)}.lvl-unknown{color:var(--muted)}.bar{display:inline-block;height:8px;border-radius:4px;
 background:var(--accent);
 vertical-align:middle;margin-right:6px}.gen{font-size:12px;color:var(--mid)}
 ul.checks{list-style:none;padding:0;margin:0}ul.checks li{padding:2px 0}
@@ -101,14 +101,25 @@ _NO_WHY = (
 )
 
 
-#: Ключи живого поиска (`weak.live.search`, `ask.attach_patents`) — по-русски для страницы.
-_LIVE_NAMES = {
+#: Ключи живого поиска и отказов (`weak.live.search`, `AskResult.live_errors`) — по-русски для
+#: страницы и веб-интерфейса (`/api/glossary`).
+LIVE_NAMES = {
     "google_news_en": "Google Новости (англ.)",
     "google_news_ru": "Google Новости (рус.)",
     "cyberleninka": "КиберЛенинка",
     "habr": "Хабр",
     "github": "GitHub",
     "patents": "патенты EPO",
+    "google_news_candidates": "Google Новости по кандидатам",
+    "google_news_money": "Google Новости для денежного потока",
+    "deepen": "аннотации arXiv/OpenAlex",
+    "assess": "оценка зрелости",
+    "tech": "разметка работ приёмами",
+    "nih_reporter": "гранты NIH",
+    "preprint": "препринты Europe PMC",
+    "clinicaltrials": "ClinicalTrials.gov",
+    "yc": "каталог Y Combinator",
+    "summaries": "русские резюме источников",
 }
 
 
@@ -123,6 +134,12 @@ _LOW_TRUST = (
     '<span class="chip no">пониженная доверенность: подтверждено только соцсетями, '
     "блогами или пресс-релизами</span>"
 )
+#: Новостной поиск по кандидату не ответил (`Signal.news_unmeasured`): «новостей нет» — не
+#: измерение, и читатель обязан это видеть.
+_UNMEASURED = (
+    '<span class="chip no">новости не проверены: поиск не ответил — отсутствие новостей '
+    "здесь ничего не значит</span>"
+)
 
 #: Объяснения неочевидных терминов страницы — единственное место их текста: из него же
 #: собраны тултипы (`_hint`) и раздел «Как считается», чтобы они не расходились.
@@ -132,9 +149,11 @@ HINTS: dict[str, str] = {
         "arXiv и OpenAlex) вырастет сильнее, чем в среднем по области. Логистическая "
         "регрессия, обученная на трёх исторических срезах (2020, 2022, 2024); признаки "
         "считаются относительно остальных кандидатов этого же запроса. Проверка будущим — "
-        "обучение на двух срезах, проверка на третьем: AUC 0.85 / 0.82 / 0.73 при случайном "
-        "≈ 0.6. По ней построен порядок ТОП. Это НЕ «насколько технология подходит запросу» "
-        "— для этого колонка «Соответствие запросу»."
+        "обучение на двух срезах, проверка на третьем: AUC 0.83 ± 0.07, 0.90 ± 0.06 и "
+        "0.83 ± 0.09 (случайный порядок — около 0.60). Это валидация процедуры обучения на "
+        "трёх срезах, а не этой установленной модели. По ней построен порядок ТОП. Это НЕ "
+        "«насколько технология "
+        "подходит запросу» — для этого колонка «Соответствие запросу»."
     ),
     "relevance": (
         "О предмете ли запроса свидетельства технологии, по шкале 0–3 (UMBRELA): 3 — "
@@ -145,10 +164,11 @@ HINTS: dict[str, str] = {
         "исключённых; в порядок и уверенность оценка не входит."
     ),
     "predictors": (
-        "Три главных слагаемых уверенности: вклад = вес признака в модели × отклонение его "
-        "значения от среднего. «За» поднимает уверенность, «против» опускает. Признаки: "
-        "доля публикаций по ядру за последний год; насколько она выше, чем у других "
-        "кандидатов запроса; стоят ли за технологией компании; сколько их."
+        "Главные слагаемые уверенности (до трёх): вклад = вес признака в модели × отклонение "
+        "его значения от среднего. «За» поднимает уверенность, «против» опускает. В модели "
+        "сейчас один признак — насколько доля публикаций по ядру за последний год выше, чем "
+        "у других кандидатов запроса; долю саму по себе, компании и их число обучение "
+        "отбросило: точности они не добавляли."
     ),
     "stage": (
         "Самая продвинутая стадия, которую показывают свидетельства: концепция/исследование "
@@ -245,7 +265,7 @@ def _pct(x: float) -> str:
 
 
 def _checks_ratio(sig: Signal) -> str:
-    scored = [c for c in sig.checks if not c.entry]
+    scored = [c for c in sig.checks if c.counted]
     return f"{sum(c.passed for c in scored)} из {len(scored)}"
 
 
@@ -272,7 +292,7 @@ def _predictors_cell(sig: Signal) -> str:
     пройденные проверки свидетельств."""
     if sig.predictors:
         return "<br>".join(_e(p) for p in sig.predictors)
-    passed = [c.name for c in sig.checks if c.passed and not c.entry]
+    passed = [c.name for c in sig.checks if c.passed and c.counted]
     return _e("; ".join(passed)) or "—"
 
 
@@ -328,6 +348,12 @@ def _facts(sig: Signal) -> str:
     return f'<h3>Хронология</h3><ol class="facts">{items}</ol>'
 
 
+def _web_url(url: str) -> bool:
+    """Ссылкой становится только `http(s)`: `javascript:` и `data:` из чужой ленты
+    экранированием не обезвреживаются (BR-24, NFR-53)."""
+    return url.strip().lower().startswith(("http://", "https://"))
+
+
 def _sources_table(sources: list[Source]) -> str:
     if not sources:
         return '<p class="muted">источников нет</p>'
@@ -335,7 +361,9 @@ def _sources_table(sources: list[Source]) -> str:
     for s in sources:
         title = _e(s.title) or _e(s.url)
         link = (
-            f'<a href="{_e(s.url)}" target="_blank" rel="noopener">{title}</a>' if s.url else title
+            f'<a href="{_e(s.url)}" target="_blank" rel="noopener">{title}</a>'
+            if _web_url(s.url)
+            else title
         )
         who = f'<br><span class="muted">{_e(s.publisher)}</span>' if s.publisher else ""
         summary = ""
@@ -372,7 +400,7 @@ def _core(sig: Signal) -> str:
     return (
         f'<p class="muted">Ядро технологии: <b>{_e(sig.core)}</b> — {_e(trace)}; '
         f"этими же словами — {sig.label_works} работ ({visible} по видимости). "
-        "Корпус arXiv + OpenAlex, 5.5 млн работ.</p>"
+        "Корпус arXiv + OpenAlex.</p>"
     )
 
 
@@ -383,12 +411,25 @@ def _patents(sig: Signal) -> str:
     нет»: ноль пишется числом и выглядит как ноль.
     """
     if not sig.patents:
-        return ""
+        return '<p class="muted">патенты не проверялись: источник выключен или не ответил</p>'
     return (
-        f'<p class="muted">Патентная активность (EPO OPS, всемирный охват): '
-        f"{_e(sig.patents)}. В уверенность не входит — источник добран нами "
-        "после оценки.</p>"
+        f"<p>EPO OPS, всемирный охват: {_e(sig.patents)}. Свежие патенты с заявителем — в "
+        "источниках карточки. В уверенность не входит — источник добран нами после "
+        "оценки.</p>"
     )
+
+
+def _why(sig: Signal) -> str:
+    """«Почему это слабый сигнал» и дословная опора из источника, если она сверена
+    (`card.verified_quote`)."""
+    if not sig.why:
+        return '<p class="muted">объяснение без ссылок на источники отброшено</p>'
+    quote = (
+        f'<blockquote class="muted">«{_e(sig.why_quote)}» — дословно из источника</blockquote>'
+        if sig.why_quote
+        else ""
+    )
+    return f"<p>{_e(sig.why)}</p>{quote}"
 
 
 def _companies(sig: Signal) -> str:
@@ -436,7 +477,7 @@ def _card(i: int, sig: Signal, history_runs: int = 0) -> str:
         f"{' · условие попадания в ТОП' if c.entry else ''}</span></li>"
         for c in sig.checks
     )
-    scored = [c for c in sig.checks if not c.entry]
+    scored = [c for c in sig.checks if c.counted]
     passed = sum(c.passed for c in scored)
     variants = "".join(f'<span class="chip">{_e(v)}</span>' for v in sig.variants)
     relevance = (
@@ -449,15 +490,18 @@ def _card(i: int, sig: Signal, history_runs: int = 0) -> str:
 <details class="sig" id="s{i}"><summary>{_row(i, sig)}</summary><div class="body">
 <p><span class="chip">стадия: {_e(STAGE_LABELS.get(sig.stage, sig.stage))}</span>{"".join(
     f'<span class="chip">есть {_e(w)}</span>' for k, w in _COMMERCE if sig.judgments.get(k))}
-{"" if sig.corroborated else _LOW_TRUST}</p>
+{"" if sig.corroborated else _LOW_TRUST}{_UNMEASURED if sig.news_unmeasured else ""}</p>
 {relevance}
+{f'<p><b>Приём:</b> {_e(sig.technique)} <span class="muted">— сверх категории «{_e(sig.category)}»</span></p>' if sig.technique else ""}
 {_facts(sig)}
 <h3>Описание технологии</h3><p>{_e(sig.description) or _NONE}</p>
 <h3>Потенциальное преимущество</h3><p>{_e(sig.advantage) or '<span class="muted">—</span>'}</p>
 <h3>Кейс-пример</h3><p>{_e(sig.case) or '<span class="muted">—</span>'}</p>
 <h3>Кто это делает</h3><p>{_companies(sig)}</p>
+<h3>Патенты</h3>{_patents(sig)}
 <h3>Почему это слабый сигнал</h3>
-<p>{_e(sig.why) or '<span class="muted">объяснение без ссылок на источники отброшено</span>'}</p>
+{_why(sig)}
+{f'<p class="muted">Слой: {_e(sig.layer_reason)}</p>' if sig.layer_reason else ""}
 {_hypothesis(sig)}
 <details class="more"><summary>Как посчитана уверенность — {_pct(sig.confidence)}</summary>
 {_model_block(sig)}
@@ -469,10 +513,9 @@ def _card(i: int, sig: Signal, history_runs: int = 0) -> str:
 <p class="muted">{_e(HINTS["evidence"])} Работ корпуса: {sig.papers} · новостей: {sig.news} ·
 доля свидетельств моложе года: {_pct(sig.recent_share)}.</p>
 </details>
-<details class="more"><summary>След в научном корпусе и патентах</summary>
+<details class="more"><summary>След в научном корпусе</summary>
 <h3>Как это называют в работах</h3><p>{variants}</p>
 {_core(sig)}
-{_patents(sig)}
 <p class="muted">Откуда кандидат: {_e(sig.stream)} поток.</p>
 </details>
 <details class="more"><summary>Источники — {len(sig.sources)}</summary>
@@ -614,6 +657,18 @@ def render(result: AskResult) -> str:
         else ""
     )
 
+    watch = (
+        '<details class="sec" id="watch"><summary><h2>Зарождающееся — наблюдать — '
+        f'{len(result.watch)}</h2> <span class="muted">▸ раскрыть</span></summary>'
+        '<div class="note">Не тренд, но пока и не слабый сигнал: нужно хотя бы два '
+        "независимых подтверждения из трёх — несколько работ, свежие патенты, компания или "
+        "пилот. Такие технологии могут и не выстрелить; их стоит перепроверить позже.</div><ul>"
+        + "".join(f"<li>{_name(s)} — {_e(s.layer_reason)}</li>" for s in result.watch)
+        + "</ul></details>"
+        if result.watch
+        else ""
+    )
+
     categories = (
         "<h3>Снято как рыночная категория, а не сигнал — "
         f"{len(result.categories)}</h3>"
@@ -626,12 +681,12 @@ def render(result: AskResult) -> str:
     )
 
     live = " · ".join(
-        f"{_e(_LIVE_NAMES.get(k, k))}: {v}" for k, v in result.live_by_source.items()
+        f"{_e(LIVE_NAMES.get(k, k))}: {v}" for k, v in result.live_by_source.items()
     )
     errors = (
         '<p class="no">Не ответили: '
         + " · ".join(
-            f"{_e(_LIVE_NAMES.get(k, k))} ({_e(v)})" for k, v in result.live_errors.items()
+            f"{_e(LIVE_NAMES.get(k, k))} ({_e(v)})" for k, v in result.live_errors.items()
         )
         + "</p>"
         if result.live_errors
@@ -681,6 +736,7 @@ def render(result: AskResult) -> str:
 хронологию и источники. Значок ⓘ объясняет колонку.</p>
 {_shortfall(result)}
 {head if result.signals else ""}{cards}
+{watch}
 
 <details class="sec" id="excl"><summary><h2>Исключено из выдачи и почему — {len(result.excluded)
     + len(result.thin) + len(result.categories)}</h2> <span class="muted">▸ раскрыть</span></summary>
@@ -752,7 +808,7 @@ def from_json(d: dict[str, Any]) -> AskResult:
         for f in ("description", "advantage", "case", "why", "relevance_why", "hypothesis"):
             setattr(s, f, drop_foreign(getattr(s, f)))
         s.facts = [f for f in s.facts if not foreign_script(f.get("text", ""))]
-        s.stage = stage_floor(s.stage, s.judgments)
+        s.stage = evidence_stage(s.stage, s.judgments)
         for src in s.sources:
             src.summary_ru = drop_foreign(src.summary_ru)
         return s
@@ -761,5 +817,6 @@ def from_json(d: dict[str, Any]) -> AskResult:
     r.signals = [signal(x) for x in d.get("signals") or []]
     r.excluded = [signal(x) for x in d.get("excluded") or []]
     r.thin = [signal(x) for x in d.get("thin") or []]
+    r.watch = [signal(x) for x in d.get("watch") or []]
     r.context = [_make(Source, c) for c in d.get("context") or []]
     return r

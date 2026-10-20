@@ -116,7 +116,7 @@ def test_backtest_signals_measures_both_ends_on_one_slice_set(tmp_path, monkeypa
 
     monkeypatch.setattr(bs, "Store", FakeStore)
     monkeypatch.setattr(bs, "footprints", fake_footprints)
-    monkeypatch.setattr(bs, "news_many", fake_news)
+    monkeypatch.setattr(bs, "news_many_measured", fake_news)
     monkeypatch.setattr(bs, "REPO", tmp_path)
     monkeypatch.setattr(bs.core_mod, "SLICES", None)  # состояние процесса — вернуть
     monkeypatch.setattr(sys, "argv", ["x", "--dir", "bt-2022-09-15"])

@@ -1,0 +1,134 @@
+@startuml use-cases
+' Диаграмма сценариев использования АС ПЕЛИКАН. Перечень — 05-use-case-model.md §3.
+' Статус: пакет B целиком — Пт (прототип); UC-13 — Снято (c1c4ea8), актор к нему не ведёт;
+' UC-26 — Р / Ф (флаги); остальные — Р. Связи — 05-use-case-model.md §4.
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Аналитик" as analyst
+actor "Внешний\nпотребитель API" as apiclient
+actor "Администратор\nстенда" as admin
+actor "ML-инженер" as ml
+actor "Время" as timer
+actor "Сервер\nмоделей" as llm <<secondary>>
+actor "Живые источники,\nEPO, arXiv/OpenAlex" as sources <<secondary>>
+actor "Quack" as quack <<secondary>>
+actor "Модель-судья" as judge <<secondary>>
+actor "Compose,\nFunnel" as infra <<secondary>>
+
+rectangle "АС ПЕЛИКАН" {
+  package "A. Поиск слабых сигналов" {
+    usecase "UC-01 Задать запрос" as UC01
+    usecase "UC-02 Ожидать выполнения" as UC02
+    usecase "UC-03 Обработать запрос\nиз очереди" as UC03
+    usecase "UC-04 Изучить отчёт" as UC04
+    usecase "UC-05 Изучить карточку\nсигнала" as UC05
+    usecase "UC-06 Просмотреть\nисключённое" as UC06
+    usecase "UC-07 Поделиться" as UC07
+    usecase "UC-08 Сохранить PDF" as UC08
+    usecase "UC-09 История" as UC09
+    usecase "UC-10 Палитра команд" as UC10
+    usecase "UC-11 Руководство" as UC11
+    usecase "UC-12 Оформление" as UC12
+    usecase "UC-13 Классический\nинтерфейс (Снято)" as UC13 <<снято>>
+  }
+  package "B. Исследования (Пт)" {
+    usecase "UC-14 Углубить поиск" as UC14
+    usecase "UC-15 Ветка" as UC15
+    usecase "UC-16 Статья" as UC16
+    usecase "UC-17 Тема на автопилоте" as UC17
+    usecase "UC-18 Плановый прогон\nтемы" as UC18
+  }
+  package "C. Интеграция" {
+    usecase "UC-19 REST API" as UC19
+  }
+  package "D. Корпус и данные" {
+    usecase "UC-20 Собрать корпус" as UC20
+    usecase "UC-21 Эмбеддинги" as UC21
+    usecase "UC-22 Перелив из Quack" as UC22
+    usecase "UC-30 Проверить полноту" as UC30
+  }
+  package "E. Качество и модели" {
+    usecase "UC-23 Оценка на датасете" as UC23
+    usecase "UC-25 Бэктест" as UC25
+    usecase "UC-24 Модель роста" as UC24
+    usecase "UC-31 Модель этапа 1" as UC31
+    usecase "UC-26 Замер ТЗ и флаги\n(Р / Ф)" as UC26
+    usecase "UC-29 Обновить отчёты\nистории" as UC29
+  }
+  package "F. Эксплуатация" {
+    usecase "UC-27 Развернуть стенд" as UC27
+    usecase "UC-28 Контролировать стенд" as UC28
+    usecase "UC-32 Сторож исполнителя" as UC32
+  }
+}
+
+analyst --> UC01
+analyst --> UC02
+analyst --> UC04
+analyst --> UC07
+analyst --> UC08
+analyst --> UC09
+analyst --> UC10
+analyst --> UC11
+analyst --> UC12
+analyst --> UC14
+analyst --> UC15
+analyst --> UC16
+analyst --> UC17
+apiclient --> UC19
+ml --> UC20
+ml --> UC21
+ml --> UC22
+ml --> UC30
+ml --> UC23
+ml --> UC24
+ml --> UC25
+ml --> UC26
+ml --> UC29
+ml --> UC31
+admin --> UC27
+admin --> UC28
+timer --> UC18
+timer --> UC32
+
+UC01 ..> UC03 : <<include>>
+UC02 ..> UC03 : наблюдает, отменяет
+UC14 ..> UC03 : <<include>>
+UC18 ..> UC03 : <<include>>
+UC04 ..> UC05 : <<include>>
+UC04 ..> UC06 : <<include>>
+UC07 ..> UC04 : <<extend>>
+UC08 ..> UC04 : <<extend>>
+UC10 ..> UC04 : <<extend>>
+UC10 ..> UC01 : <<extend>>
+UC10 ..> UC09 : <<extend>>
+UC12 ..> UC04 : <<extend>>
+UC12 ..> UC01 : <<extend>>
+UC12 ..> UC09 : <<extend>>
+UC14 ..> UC04 : <<extend>>
+UC17 ..> UC18 : порождает
+UC19 ..> UC01 : те же цели через REST\n(UC-01/02/04/09)
+UC30 ..> UC20 : приёмка
+UC30 ..> UC22 : приёмка
+UC21 ..> UC20 : следует за
+UC21 ..> UC22 : следует за
+UC32 ..> UC03 : фон
+UC32 ..> UC28 : фон
+UC25 ..> UC24 : даёт срезы
+UC25 ..> UC26 : плечи замера
+UC23 ..> UC31 : признаки
+UC24 ..> UC29 : пересчёт
+UC29 ..> UC03 : <<include>>
+UC26 ..> UC03 : <<include>>
+
+UC03 --> llm
+UC03 --> sources
+UC16 --> llm
+UC21 --> llm
+UC22 --> quack
+UC23 --> judge
+UC27 --> infra
+UC28 --> infra
+@enduml

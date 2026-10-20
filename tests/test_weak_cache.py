@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 
 from pelican.weak import cache
@@ -16,7 +17,22 @@ def _doc(title: str) -> LiveDoc:
 def _use(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cache, "DIR", tmp_path / "live-cache")
     monkeypatch.setattr(cache, "ENABLED", True)
-    monkeypatch.setattr(cache, "_swept", True)
+    monkeypatch.setattr(cache, "_swept_at", time.time())
+
+
+def test_sweep_runs_again_after_a_day_in_one_process(tmp_path, monkeypatch) -> None:
+    """Долгоживущий процесс чистит каталог раз в сутки, а не только при старте (PEL-H-10)."""
+    _use(tmp_path, monkeypatch)
+    cache.DIR.mkdir(parents=True)
+    old = cache.DIR / "old.json"
+    old.write_text("{}", encoding="utf-8")
+    stale = time.time() - 2 * cache.TTL_S
+    os.utime(old, (stale, stale))
+    cache._sweep()
+    assert old.exists()  # почищено меньше суток назад — не трогаем
+    monkeypatch.setattr(cache, "_swept_at", time.time() - cache.TTL_S - 1)
+    cache._sweep()
+    assert not old.exists()
 
 
 def test_saved_docs_come_back(tmp_path, monkeypatch) -> None:

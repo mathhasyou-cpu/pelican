@@ -24,10 +24,12 @@ corpus` возвращает одно плечо, чей recall 0.92 и есть
 ## Что в выходе и чего там нет
 
 `is_weak_signal` — жанр модели равен «зарождающаяся технология»; `kind`/`stage` — на
-языке словаря `weak.kinds` / `weak.rubric` и по-русски; `confidence` — доля проверок,
-считаемых без компаний (научная опора, разные типы источников, разные издатели), та же
-семантика, что у карточки `trends ask`; `probability` — обученная модель
-(`weak/model.py`), пусто, пока правило её обучения не выполнено; `why` — объяснение
+языке словаря `weak.kinds` / `weak.rubric` и по-русски; `checks_share` — доля проверок,
+считаемых без компаний (научная опора, разные типы источников, разные издатели).
+⚠️ Это НЕ `confidence` страницы выдачи: там уверенность — вероятность модели роста
+(`ask.score`), а у CSV своей модели роста нет. `probability` — модель этапа 1
+(`weak/model.json`, «похоже ли на слабый сигнал»), пусто, пока правило её обучения не
+выполнено; против роста на бэктестах она ниже пола (docs/weak-audit.md); `why` — объяснение
 модели со ссылками на номера свидетельств; `sources` — сами свидетельства с датой,
 издателем и доверенностью.
 
@@ -39,18 +41,20 @@ from __future__ import annotations
 
 import argparse
 import csv
-import io as _io
 import json
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from pelican import locks  # noqa: E402
 from pelican.config import settings  # noqa: E402
+from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.store import Store  # noqa: E402
 from pelican.weak import model as model_mod  # noqa: E402
+from pelican.weak.core import names_core  # noqa: E402
 from pelican.weak.dataset import (  # noqa: E402
     ARMS,
     EMBED_FEATURES,
@@ -104,8 +108,7 @@ def pick(columns: list[str], wanted: tuple[str, ...]) -> str | None:
 
 def checks_for(row: Row) -> list[tuple[str, bool, str]]:
     """Проверки уверенности, считаемые без списка компаний (семантика — `weak.ask`)."""
-    needle = row.core.lower()
-    named = [p for p in row.papers if needle and needle in p.text.lower()]
+    named = [p for p in row.papers if names_core(p.text, row.core)]
     kinds = {d.trust.kind for d in row.news}
     if row.papers:
         kinds.add(SCIENCE)
@@ -220,7 +223,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     head = [
         "n", "tech", "domain", "is_weak_signal", "kind", "kind_ru", "stage", "stage_ru",
-        "confidence", "checks", "probability", "predictors", "votes", "why", "sources",
+        "checks_share", "checks", "probability", "predictors", "votes", "why", "sources",
     ]  # fmt: skip
     n_signal = n_assessed = 0
     stage_hits = stage_total = 0
@@ -311,4 +314,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Модель одна на стенд (NFR-26): исполнитель API держит тот же замок — «занято» = код 75.
+    try:
+        with locks.hold(MODEL_LOCK):
+            main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

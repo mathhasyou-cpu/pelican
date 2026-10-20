@@ -58,10 +58,13 @@ PLAYERS_CAP = 4
 SHARE_PRIOR_WEIGHT = 10
 #: Признаки скоринга, нормированные ВНУТРИ запроса (query-level normalization в
 #: learning-to-rank): модель сравнивает кандидата с остальными кандидатами того же запроса,
-#: а не с абсолютной шкалой. Абсолютная доля свежих работ дрейфует между эпохами, и модель
-#: на ней ранжирует пул хуже простой формулы (бэктест трёх срезов: 0.81 / 0.71 / 0.60
-#: против 0.85 / 0.82 / 0.73 на этих признаках).
-QUERY_SCIENCE: tuple[str, ...] = ("query_share", "query_share_pct", "backed", "players_cap")
+#: а не с абсолютной шкалой: абсолютная доля свежих работ дрейфует между эпохами.
+#: ⚠️ Выигрыш нормировки на пулах с научным потоком не перемерен в одной постановке:
+#: holdout внутри запроса 0.83 / 0.90 / 0.83, общий набор `S` без нормировки — 0.81 / 0.90 /
+#: 0.90 (docs/todo.md §118).
+QUERY_SCIENCE: tuple[str, ...] = (
+    "query_share", "query_share_pct", "share_missing", "backed", "players_cap",
+)  # fmt: skip
 #: Коммерческая стадия — чтения свидетельств той же оценкой зрелости (`assess.JUDGMENTS`):
 #: раунд, продажи, пилот. Двоичные, поэтому от эпохи не плывут так, как доли и счётчики;
 #: кандидата с раундом модель видит, даже если у всех соседей по запросу раунд тоже есть.
@@ -78,6 +81,7 @@ COMMERCE_SOURCE: dict[str, str] = {
 QUERY_LABELS: dict[str, str] = {
     "query_share": "доля публикаций за последний год",
     "query_share_pct": "публикации свежее, чем у других кандидатов запроса",
+    "share_missing": "след ядра в корпусе не измерен",
     "backed": "за технологией стоят компании",
     "players_cap": "число компаний",
     "funding": "в новостях есть раунд или сделка",
@@ -85,10 +89,10 @@ QUERY_LABELS: dict[str, str] = {
     "pilot": "есть пилот с заказчиком",
 }
 #: Признаки «да/нет»: подпись говорит, что признак ДАЛ, а не только его имя.
-QUERY_BINARY = frozenset({"backed", *QUERY_COMMERCE})
+QUERY_BINARY = frozenset({"backed", "share_missing", *QUERY_COMMERCE})
 
 
-def query_features(pool: list[dict[str, float | None]]) -> list[dict[str, float]]:
+def query_features(pool: list[dict[str, float | None]]) -> list[dict[str, float | None]]:
     """Признаки `QUERY_FEATURES` для каждого кандидата ОДНОГО запроса.
 
     Вход — по кандидату: `core_last_year_share` (доля работ ядра за последний год или
@@ -107,22 +111,34 @@ def query_features(pool: list[dict[str, float | None]]) -> list[dict[str, float]
     if shares:
         mid = len(shares) // 2
         prior = shares[mid] if len(shares) % 2 else (shares[mid - 1] + shares[mid]) / 2
-    shrunk = []
+    shrunk: list[float | None] = []
     for r in pool:
         s = r.get("core_last_year_share")
         works = float(r.get("core_works") or 0.0)
         if s is None or math.isnan(float(s)):
-            shrunk.append(-1.0)  # измерить нечем — в хвост, как в прежней формуле
+            shrunk.append(None)
         else:
             m = SHARE_PRIOR_WEIGHT
             shrunk.append((float(s) * works + m * prior) / (works + m))
+    # ⚠️ Пропуск — не значение: «−1.0» как доля давала штраф −2.7σ, выученный моделью как
+    # штраф, и одновременно входила в знаменатель перцентиля, завышая его всем остальным
+    # (PEL-F-01). Приём query-level normalization: пропуски исключаются из нормировки,
+    # «измерено ли» — отдельный индикатор, ранг — сглаженный `(r − 0.5) / n` со средним
+    # рангом при ничьих, чтобы на пуле из 5 кандидатов признак не прыгал шагом 0.2 от 1/n.
+    measured = sorted(v for v in shrunk if v is not None)
     out = []
-    for r, v in zip(pool, shrunk):
+    for r, v in zip(pool, shrunk, strict=True):
         players = float(r.get("players") or 0.0)
+        pct = None
+        if v is not None:
+            below = sum(x < v for x in measured)
+            ties = sum(x == v for x in measured)
+            pct = (below + (ties + 1) / 2 - 0.5) / len(measured)
         out.append(
             {
                 "query_share": v,
-                "query_share_pct": sum(x <= v for x in shrunk) / len(shrunk),
+                "query_share_pct": pct,
+                "share_missing": 0.0 if v is not None else 1.0,
                 "backed": 1.0 if players > 0 or float(r.get("money_stream") or 0.0) > 0 else 0.0,
                 "players_cap": min(players, PLAYERS_CAP),
                 **{

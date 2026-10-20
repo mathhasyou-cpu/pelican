@@ -63,14 +63,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 # Консоль планировщика и Git Bash приезжают в cp1251, а вывод здесь русский.
 sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from pelican.config import DATA_DIR, settings  # noqa: E402
-from pelican.store import Store  # noqa: E402
-from pelican.llm import LLMClient  # noqa: E402
+from pelican.config import EMB_DIR, settings  # noqa: E402
 from pelican.embed import embed, normalise  # noqa: E402
+from pelican.llm import LLMClient  # noqa: E402
+from pelican.store import Store  # noqa: E402
 from pelican.weak import ShardCorpus, junk_ids, top_k  # noqa: E402
 
 TSV = Path(__file__).resolve().parent / "weak_signals_100.tsv"
-EMB_DIR = DATA_DIR / "emb-science"
 ARMS = ("ru", "ru+domain", "en-llm", "en-llm+expand", "null")
 #: Сколько названий переводить одним вызовом. Ответ — эхо плюс перевод плюс три
 #: синонима, поэтому пакет здесь меньше классификационного (LLM_BATCH_SIZE = 40).

@@ -32,12 +32,14 @@ import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pelican import quack  # noqa: E402
+from pelican.config import settings  # noqa: E402
+from pelican.weak import core  # noqa: E402
 
 SHORT_CORE = 6
 LOOSE_WORDS = 4
 SCAN_CHUNK = 24
 _STOP = frozenset(
-    "a an the of for and or in on with via to by from using based as at into over".split()
+    ["a", "an", "the", "of", "for", "and", "or", "in", "on", "with", "via", "to", "by", "from", "using", "based", "as", "at", "into", "over"]
 )
 
 
@@ -66,19 +68,12 @@ def _tokens(text: str) -> list[str]:
 
 
 def pg_query(name: str, loose: bool) -> str | None:
-    """tsquery-строка для `to_tsquery('simple', …)`; None — мерить нечем."""
-    low = name.lower()
-    words = significant(low)
-    if loose and len(words) > 1:
-        chosen = sorted(sorted(set(words), key=len, reverse=True)[:LOOSE_WORDS])
-        parts = [t for w in chosen for t in _tokens(w)]
-        return " & ".join(f"{t}:*" for t in parts) or None
-    toks = _tokens(low)
-    if not toks:
-        return None
-    if len(low) < SHORT_CORE and len(toks) == 1:
-        return f"{toks[0]} | {toks[0]}s"
-    return " <-> ".join(toks[:-1] + [f"{toks[-1]}:*"])
+    """tsquery-строка для `to_tsquery('simple', …)`; None — мерить нечем.
+
+    ⚠️ Импорт, а не копия `weak.core._match`: замер обязан мерить ту меру, что работает в
+    выдаче, и копия молча разошлась бы с ней при первой правке.
+    """
+    return core._match(name, loose) or None
 
 
 def names_from(paths: list[Path]) -> tuple[list[str], list[str]]:
@@ -147,8 +142,7 @@ def main() -> int:
     ap.add_argument("reports", nargs="+", type=Path)
     ap.add_argument("--from", dest="dsn", default="quack:localhost")
     ap.add_argument("--token", default=os.environ.get("QUACK_TOKEN", ""))
-    ap.add_argument("--url", default=os.environ.get(
-        "DATABASE_URL", "postgresql://pelican:pelican@127.0.0.1:5436/pelican"))
+    ap.add_argument("--url", default=settings.database_url)
     ap.add_argument("--limit", type=int, default=60, help="имён каждого вида")
     ap.add_argument("--out", type=Path, default=Path("reports/pg-footprint.tsv"))
     ap.add_argument("--max-id", type=int, default=None)

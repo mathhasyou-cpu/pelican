@@ -53,6 +53,15 @@ import numpy as np
 WORK_DTYPE = np.float32
 
 
+class ShardsUnavailable(RuntimeError):
+    """Шардов нет или они не того пространства.
+
+    ⚠️ Не наступить: это должно оставаться обычным исключением, не `SystemExit`. Тот наследует
+    `BaseException`, мимо `except Exception` исполнителя очереди он проходит и молча убивает
+    его поток, а задание навсегда остаётся `running`.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class Shard:
     """Один файл шарда. `since`/`until` — границы `observed_at` внутри него.
@@ -85,7 +94,7 @@ class ShardCorpus:
         self.model = model
         self.paths = sorted(directory.glob("shard-*.npz"))
         if not self.paths:
-            raise SystemExit(
+            raise ShardsUnavailable(
                 f"в {directory} нет ни одного shard-*.npz — сначала scripts/embed_science.py"
             )
 
@@ -97,7 +106,7 @@ class ShardCorpus:
             with self._open(path) as blob:
                 got = str(blob["model"])
                 if got != self.model:
-                    raise SystemExit(
+                    raise ShardsUnavailable(
                         f"{path.name}: векторы модели {got!r}, а ищем моделью {self.model!r} — "
                         "смешивать пространства нельзя"
                     )
@@ -111,9 +120,11 @@ class ShardCorpus:
 
     @staticmethod
     def _open(path: Path):
-        """Открыть шард; недописанный (`embed_science.py` пишет `np.savez` прямо в
-        целевое имя, и догон идёт параллельно с чтением) — подождать и открыть снова.
-        ⚠️ Секунда — догадка: сам `savez` шарда в 20 000 строк короче."""
+        """Открыть шард; не открылся — подождать и открыть снова.
+
+        `embed_science.py` пишет шард через временное имя и `os.replace`, так что
+        недописанного файла под целевым именем не бывает; повтор остаётся страховкой от
+        шардов, записанных до этого, и от сетевого диска. ⚠️ Секунда — догадка."""
         try:
             return np.load(path, allow_pickle=False)
         except (zipfile.BadZipFile, ValueError, OSError):
@@ -154,7 +165,7 @@ def top_k(
     for index, shard in enumerate(corpus.iter_shards()):
         vectors = shard.vectors.astype(WORK_DTYPE, copy=False)
         if vectors.shape[1] != q.shape[1]:
-            raise SystemExit(
+            raise ShardsUnavailable(
                 f"{shard.path.name}: размерность {vectors.shape[1]}, а у запроса {q.shape[1]}"
             )
         sims = q @ vectors.T  # [m, n_shard]

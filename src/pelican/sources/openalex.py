@@ -43,7 +43,7 @@ from pelican.sources._http import (
     client,
     raise_for_retryable_status,
 )
-from pelican.sources.base import Chunk, Signal, drain, term_of
+from pelican.sources.base import Chunk, PartialFetch, Signal, drain, term_of
 
 API_URL = "https://api.openalex.org/works"
 PER_PAGE = 200  # потолок OpenAlex на страницу
@@ -509,9 +509,24 @@ class OpenAlex:
                 # курсоре в глубине окна: 2.2 с на первых страницах и до 10 с
                 # дальше. Последовательные срезы складывают эти секунды, а
                 # параллельные закрывают окно за время самого медленного.
+                # ⚠️ `return_exceptions`: исчерпанный бюджет (429) на одном срезе не должен
+                # выбрасывать уже оплаченные страницы остальных — собранное уходит в
+                # `PartialFetch`, и сбор записывает его (PEL-J-03).
                 batches = await asyncio.gather(
-                    *(self._fetch_window(http, scope, lo, hi) for scope in self.filters)
+                    *(self._fetch_window(http, scope, lo, hi) for scope in self.filters),
+                    return_exceptions=True,
                 )
+                failed = [b for b in batches if isinstance(b, BaseException)]
+                done = [b for b in batches if not isinstance(b, BaseException)]
+                if failed:
+                    first = failed[0]
+                    if not isinstance(first, Exception):
+                        raise first
+                    raise PartialFetch(
+                        f"{lo:%Y-%m-%d}..{hi:%Y-%m-%d}: {len(failed)} из {len(batches)} срезов "
+                        f"не собраны ({type(first).__name__}: {first})",
+                        [s for signals in done for s in signals],
+                    ) from first
                 for signals in batches:
                     yield Chunk(signals=signals)
                 self.tally.done += 1

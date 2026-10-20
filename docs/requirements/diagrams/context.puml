@@ -1,0 +1,67 @@
+@startuml context
+' Диаграмма контекста АС ПЕЛИКАН: акторы и внешние системы вокруг границы системы.
+' Источник: docs/requirements/05-use-case-model.md §1–2, docs/architecture.puml.
+left to right direction
+skinparam shadowing false
+skinparam rectangleBorderThickness 1
+
+actor "Аналитик" as analyst
+actor "Внешний\nпотребитель API" as apiclient
+actor "Администратор\nстенда" as admin
+actor "ML-инженер" as ml
+actor "Время\n(таймер)" as timer
+
+rectangle "АС ПЕЛИКАН" as system {
+  component "Веб-интерфейс\nweb/ (React; статика api)" as web
+  component "API и очередь\npelican.api, pelican.jobs" as api
+  component "Конвейер\npelican.weak.ask" as pipeline
+  component "Сборщики и перелив\npelican.collect, load_corpus,\nscripts/embed_science.py" as etl
+  component "Скрипты качества\nи эксплуатации\nscripts/*" as scripts
+  database "Postgres 18\nworks, tech_mentions,\njobs, job_events, reports" as pg
+  storage "Шарды векторов\nemb-science/*.npz" as shards
+}
+
+cloud "Сервер моделей\nLM Studio (хост)\ngemma-4-12b-qat,\nembedding-gemma-300m" as llm
+component "Шард-сервер\npelican.shard_server :8020\n(хост, необязателен)" as shardsrv
+cloud "Живые источники\nGoogle News, КиберЛенинка,\nХабр, GitHub" as live
+cloud "EPO OPS\n(патенты)" as epo
+cloud "arXiv API\nOpenAlex API" as science
+cloud "Quack (DuckDB)\nготовый корпус" as quack
+cloud "Источники за флагом\nNIH RePORTER, Europe PMC,\nClinicalTrials.gov, YC" as extra
+node "Tailscale Funnel\n/ → api\n(перезаписывает X-Forwarded-For)" as funnel
+node "Docker Compose\nhealthcheck, restart" as compose
+cloud "Модель-судья\ngigachat3.1-10b-a1.8b\n(только замеры)" as judge
+
+analyst --> funnel
+funnel --> web
+funnel --> api
+web --> api
+apiclient --> funnel : REST /api/*
+api --> pipeline
+api --> pg
+pipeline --> pg
+pipeline --> llm
+pipeline --> shardsrv
+pipeline --> shards
+shardsrv --> shards
+pipeline --> live
+pipeline --> epo
+pipeline --> science
+pipeline ..> extra : WEAK_EXTRA_SOURCES
+etl --> science
+etl --> quack
+etl --> pg
+etl --> shards
+etl --> llm : эмбеддинги
+ml --> etl
+ml --> scripts
+scripts --> pipeline
+scripts --> pg
+scripts ..> judge
+admin --> compose
+compose --> api
+compose --> pg
+compose --> funnel : профиль stand
+admin --> api : /api/health, /api/queue
+timer --> api : сторож (60 с)
+@enduml

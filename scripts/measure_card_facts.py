@@ -356,6 +356,12 @@ def sample(folder: Path, n: int, seed: int) -> None:
         for field, claim, evidence in claims(sig)
     ]
     random.Random(seed).shuffle(items)
+    # ⚠️ Ручные вердикты не затираются повторным `--sample` (PEL-G-10).
+    if PAIRS.exists() and any(
+        (r.get("мой вердикт") or "").strip()
+        for r in csv.DictReader(PAIRS.read_text(encoding="utf-8").splitlines(), delimiter="\t")
+    ):
+        raise SystemExit(f"{PAIRS} уже размечен рукой — переименуйте его, прежде чем выписывать новый")
     with PAIRS.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, delimiter="\t")
         w.writerow(["домен", "карточка", "раздел", "утверждение", "свидетельства", "мой вердикт"])

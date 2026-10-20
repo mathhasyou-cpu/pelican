@@ -85,7 +85,7 @@ def options(
     key = (keys[i].strip().lower() if keys else "") or None
     sims = vectors[heads] @ vectors[i]
     ranked = sorted(
-        ((s, h, key is not None and keys[h].strip().lower() == key) for s, h in zip(sims.tolist(), heads)),
+        ((s, h, key is not None and keys[h].strip().lower() == key) for s, h in zip(sims.tolist(), heads, strict=True)),
         key=lambda p: (not p[2], -p[0]),
     )
     return [h for s, h, same in ranked if same or s >= BLOCK_COS][:K_SELECT]
@@ -135,6 +135,7 @@ async def _groups(labels: list[str], vectors: np.ndarray, keys: list[str] | None
         api_key=settings.llm_api_key,
         model=settings.llm_model,
         timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
     async with httpx.AsyncClient() as http:
 
@@ -151,9 +152,10 @@ async def _groups(labels: list[str], vectors: np.ndarray, keys: list[str] | None
                     name="twins",
                     max_tokens=20,
                 )
-            except LLMError:
+            except (LLMError, httpx.HTTPError):
                 # Сведение — уборка, а не стадия выдачи: без него запрос отдаёт дубли,
-                # с упавшим — не отдаёт ничего.
+                # с упавшим — не отдаёт ничего. Таймаут и обрыв — тот же случай: клиент
+                # `ReadTimeout` намеренно не ретраит (`llm/client.py`).
                 return 0
             return parse(got, len(opts))
 

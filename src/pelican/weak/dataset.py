@@ -50,8 +50,8 @@ from datetime import date
 import httpx
 
 from pelican.config import settings
-from pelican.store import Store
 from pelican.llm import LLMClient, LLMError
+from pelican.store import Store
 from pelican.weak.assess import (
     CORPUS,
     JUDGMENT_NAMES,
@@ -67,7 +67,7 @@ from pelican.weak.assess import (
 from pelican.weak.core import Footprint, cores, corpus_line, footprints_pair
 from pelican.weak.ground import Hit, ground
 from pelican.weak.kinds import EMERGING
-from pelican.weak.live import PER_SOURCE, LiveDoc, news_many
+from pelican.weak.live import PER_SOURCE, LiveDoc, news_many_measured
 from pelican.weak.neighbours import Coverage, Neighbourhood, neighbourhoods
 from pelican.weak.rubric import STAGE_RANK
 from pelican.weak.translate import translate
@@ -85,6 +85,13 @@ MIXED_PAPERS = 2
 NEWS_KEPT = PER_SOURCE
 
 ARMS = ("papers", "mixed", "corpus")
+#: Плечо с составом ВЫДАЧИ: `ask.NEWS_PER_CARD` новостей + `ask.PAPERS_PER_CARD` работ +
+#: след. Замеренный F1 относился к плечу `corpus` (3 + 2 + след), а в выдаче промпт видит
+#: другой состав (PEL-E-05); это плечо меряет ровно его. В `ARMS` не входит: по `ARMS`
+#: голосует `predict_dataset`, и лишнее плечо стоило бы прохода модели.
+ISSUE_ARM = "issue"
+ISSUE_NEWS = 5
+ISSUE_PAPERS = 2
 
 Progress = Callable[[str], None]
 
@@ -159,13 +166,17 @@ def gather(
     english = translate(names)
     for row, tr in zip(rows, english, strict=True):
         row.label_en = tr.en
-    found_news = news_many([r.label_en for r in rows], "en")
+    found_news = news_many_measured([r.label_en for r in rows], "en")
+    if missed := sum(docs is None for docs in found_news):
+        # ⚠️ Отказ (блок Google) — не «новостей нет»: замер на таком наборе молча мерил бы
+        # плечо без новостей. Громкий отказ, а не испорченное число.
+        raise RuntimeError(f"Google News не ответил на {missed} из {len(rows)} запросов")
     for row, docs in zip(rows, found_news, strict=True):
         row.news = docs[:NEWS_KEPT]
     empty = sum(1 for r in rows if not r.news)
     say(f"новостей: {sum(len(r.news) for r in rows)}, без единой новости {empty}")
 
-    if arm == "corpus":
+    if arm in ("corpus", ISSUE_ARM):
         # След корпуса: ДВА числа, ядра и самого ярлыка (docs/weak-signals.md). Ярлык —
         # английское название, как в `trends ask`, где его даёт модель.
         say(f"ядра для {len(rows)} названий...")
@@ -186,12 +197,13 @@ def candidate(row: Row, arm: str) -> Candidate:
         evidence = list(row.papers[:ARM_EVIDENCE])
     else:
         # ⚠️ Новости вытесняют работы, а не добавляются к ним.
+        n_news, n_papers = (ISSUE_NEWS, ISSUE_PAPERS) if arm == ISSUE_ARM else (MIXED_NEWS, MIXED_PAPERS)
         fresh = [
             Evidence(-1, d.published, d.title, NEWS, d.url, d.publisher)
-            for d in row.news[:MIXED_NEWS]
+            for d in row.news[:n_news]
         ]
-        evidence = fresh + list(row.papers[:MIXED_PAPERS])
-        if arm == "corpus" and row.core_print is not None and row.label_print is not None:
+        evidence = fresh + list(row.papers[:n_papers])
+        if arm in ("corpus", ISSUE_ARM) and row.core_print is not None and row.label_print is not None:
             # Последним, как в `trends ask`.
             evidence.append(Evidence(-1, "", corpus_line(row.core_print, row.label_print), CORPUS))
     return Candidate(key=row.n, name=row.tech, evidence=evidence)
@@ -203,6 +215,7 @@ async def _assess_many(candidates: list[Candidate], say: Progress) -> list[Asses
         api_key=settings.llm_api_key,
         model=settings.llm_model,
         timeout_s=settings.llm_timeout_s,
+        reasoning_effort=settings.llm_reasoning_effort,
     )
     out: list[Assessment | None] = []
     async with httpx.AsyncClient() as http:
@@ -348,6 +361,9 @@ FEATURE_LABELS: dict[str, str] = {
     "standard_or_regulation": "это стандарт, спецификация или регламент",
     "field_not_technology": "название — область, а не технология",
     "novelty_claimed": "подаётся как новое или впервые",
+    "prototype_built": "показана работающая система",
+    "pilot_with_customer": "пилот у названного заказчика",
+    "generally_available": "в продаже с платящими клиентами",
     "nn_sim_now": "сходство с ближайшей работой корпуса",
     "nn_sim_asof": "сходство с ближайшей работой до окна",
     "nn_sim_gain": "прирост сходства за окно (новизна)",

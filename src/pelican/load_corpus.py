@@ -26,6 +26,7 @@ import duckdb
 import psycopg
 
 from pelican import quack
+from pelican.config import settings
 from pelican.weak.corpus import JUNK_TYPES, MIN_TERM_CHARS
 
 SCIENCE = "('arxiv', 'openalex')"
@@ -37,6 +38,10 @@ ID_SPAN = 2**63
 
 
 SCHEMA = Path(__file__).with_name("schema.sql")
+
+
+class Refused(RuntimeError):
+    """Перелив не начат: продолжать с того, что в `works`, нельзя."""
 
 
 def _junk_sql() -> str:
@@ -78,6 +83,20 @@ def load(dsn: str, token: str, url: str, chunks: int = CHUNKS) -> None:
     total = int(quack.query(quack.connect(), dsn, token,
                             f"SELECT count(*) FROM signals WHERE source IN {SCIENCE}")[0][0])
     print(f"источник: {total:,} работ; в Postgres уже {have:,} (до id {done})", flush=True)
+    # Продолжение с `max(id)` верно, только если всё до него залито переливом: id — хэш на
+    # всём диапазоне, и одна чужая строка (UC-20) с большим id пропустила бы почти все
+    # куски. Признак — счёт: залитого ровно столько, сколько в источнике до `max(id)`.
+    if done:
+        below = int(quack.query(
+            quack.connect(), dsn, token,
+            f"SELECT count(*) FROM signals WHERE source IN {SCIENCE} AND id <= {done}",
+        )[0][0])
+        if below != have:
+            raise Refused(
+                f"в works {have:,} строк, а в источнике до id {done} — {below:,}: продолжение "
+                "с max(id) оставило бы дыру; works содержит не только перелив (UC-20?) или "
+                "источник дописан — очистите works и перелейте заново"
+            )
 
     conn = quack.connect()
     conn.execute("INSTALL postgres")
@@ -135,8 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--from", dest="dsn", required=True, help="quack:<хост>[:<порт>]")
     ap.add_argument("--token", default=os.environ.get("QUACK_TOKEN", ""))
-    ap.add_argument("--url", default=os.environ.get(
-        "DATABASE_URL", "postgresql://pelican:pelican@127.0.0.1:5436/pelican"))
+    ap.add_argument("--url", default=settings.database_url)
     ap.add_argument("--chunks", type=int, default=CHUNKS)
     args = ap.parse_args(argv)
     if not args.token:
@@ -144,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         load(args.dsn, args.token, args.url, args.chunks)
-    except duckdb.Error as exc:
+    except (duckdb.Error, psycopg.Error, Refused) as exc:
         print(f"отказ: {exc}", file=sys.stderr)
         return 1
     return 0

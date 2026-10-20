@@ -76,7 +76,7 @@ from pelican.store import Store  # noqa: E402
 from pelican.weak import asof  # noqa: E402
 from pelican.weak import core as core_mod  # noqa: E402
 from pelican.weak.core import footprints  # noqa: E402
-from pelican.weak.live import news_many  # noqa: E402
+from pelican.weak.live import news_many_measured  # noqa: E402
 from pelican.weak.stats import span  # noqa: E402
 
 #: Во сколько раз должен вырасти след, чтобы считать это ростом, а не шевелением.
@@ -87,6 +87,12 @@ GROWTH = 2.0
 #: несравнимы (rolling-origin evaluation). Два года — как у первого бэктеста; в годах, а
 #: не в днях, чтобы горизонт был календарной датой (730 дней через високосный год — 14-е).
 HORIZON_YEARS = 2
+#: База (работ ядра на срезе), ниже которой отношение «после / до» — не рост, а «появилась
+#: ли работа»: при нуле исход кодируется константой (×2 или 0), и под тонкими срезами
+#: 2020/2022 медиана домена становится самой константой (PEL-G-06). Такие строки — своя
+#: категория: в разделение (AUC) не идут, печатаются отдельно. Приём — минимальный размер
+#: базы у Klavans & Boyack. ⚠️ 5 — догадка, не замер.
+MIN_BASE = 5
 
 
 def slices_at(store: Store, cut: date) -> frozenset[str]:
@@ -130,6 +136,13 @@ def as_of_of(folder: Path, given: str | None) -> date:
 SHUFFLES = 200
 
 
+def _auc(a: list[float], b: list[float]) -> float:
+    """Манн–Уитни: доля пар, где элемент `a` больше элемента `b` (ничьи — пополам)."""
+    wins = sum(1 for x in a for y in b if x > y)
+    ties = sum(1 for x in a for y in b if x == y)
+    return (wins + 0.5 * ties) / (len(a) * len(b))
+
+
 def _separation(
     top: list[float], control: list[float], folder: Path, extra: dict | None = None
 ) -> None:
@@ -144,13 +157,14 @@ def _separation(
     выборках случайное разбиение само по себе даёт 0.55–0.58.
     """
     if not top or not control:
+        print("")
+        print(f"=== РАЗДЕЛЕНИЕ не измеримо: строк с базой ≥ {MIN_BASE} — {len(top)}/{len(control)} ===")
+        meta = {"auc": None, "пол": None, "топ": len(top), "контроль": len(control), **(extra or {})}
+        (folder / "backtest.json").write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return
-
-    def auc(a: list[float], b: list[float]) -> float:
-        wins = sum(1 for x in a for y in b if x > y)
-        ties = sum(1 for x in a for y in b if x == y)
-        return (wins + 0.5 * ties) / (len(a) * len(b))
-
+    auc = _auc
     got = auc(top, control)
     pool = [*top, *control]
     rnd = random.Random(20260916)
@@ -161,7 +175,10 @@ def _separation(
     floors.sort()
     ceiling = floors[int(0.95 * len(floors))]
     print("")
-    print(f"=== РАЗДЕЛЕНИЕ по приросту следа (AUC, n={len(top)}/{len(control)}) ===")
+    print(
+        f"=== РАЗДЕЛЕНИЕ по приросту следа (AUC, n={len(top)}/{len(control)}, "
+        f"база ≥ {MIN_BASE}) ==="
+    )
     print(f"  ТОП против контроля: {got:.2f}")
     middle = floors[len(floors) // 2]
     print(f"  пол случайности: медиана {middle:.2f}, 95-й перцентиль {ceiling:.2f}")
@@ -238,7 +255,10 @@ def main() -> None:
     # двухлетней давности, а у более старого показало бы сегодняшние два года.
     window = f"after:{cut.isoformat()} before:{(horizon or date.today()).isoformat()}"
     print(f"новости {window} по {len(labels)} направлениям...", flush=True)
-    fresh = news_many(labels, "en", window=window)
+    # ⚠️ Не ответил (блок Google) — пустая клетка «не проверено», а не ноль новостей.
+    fresh = news_many_measured(labels, "en", window=window)
+    if missed := sum(news is None for news in fresh):
+        print(f"⚠️ новости после среза не проверены у {missed} из {len(fresh)}", flush=True)
 
     rows = []
     for (where, domain, sig), news in zip(everyone, fresh, strict=True):
@@ -258,7 +278,8 @@ def main() -> None:
                 "работ после": after,
                 "прирост": grew,
                 "во сколько раз": round(ratio, 2),
-                "новостей после среза": len(news),
+                "новостей после среза": len(news) if news is not None else "",
+                "тонкая база": int(before < MIN_BASE),
             }
         )
 
@@ -269,31 +290,58 @@ def main() -> None:
         w.writerows(rows)
 
     print("")
+    print(f"=== база на срезе: ноль работ / меньше {MIN_BASE} — по доменам ===")
+    for domain in sorted({r["домен"] for r in rows}):
+        mine = [r for r in rows if r["домен"] == domain]
+        zero = sum(1 for r in mine if r["работ на срезе"] == 0)
+        thin = sum(r["тонкая база"] for r in mine)
+        print(f"  {domain}: ноль {zero} из {len(mine)} ({zero / len(mine):.0%}), тонких {thin}")
+    print("")
     for name in ("ТОП", "контроль"):
         here = [r for r in rows if r["где"] == name]
         if not here:
             continue
         ratios = [r["во сколько раз"] for r in here]
         grown = sum(1 for r in here if r["во сколько раз"] >= GROWTH)
-        with_news = sum(1 for r in here if r["новостей после среза"] > 0)
+        checked = [r for r in here if r["новостей после среза"] != ""]
+        with_news = sum(1 for r in checked if r["новостей после среза"] > 0)
         print(f"=== {name} ({len(here)}) ===")
         print(f"  медиана прироста следа: ×{statistics.median(ratios):.2f}")
         print(
             f"  выросли в {GROWTH:g}+ раз: {grown} ({grown / len(here):.0%}) "
             f"{span(grown, len(here))}"
         )
-        print(
-            f"  с новостями после среза: {with_news} ({with_news / len(here):.0%}) "
-            f"{span(with_news, len(here))}"
-        )
+        if checked:
+            print(
+                f"  с новостями после среза: {with_news} из {len(checked)} проверенных "
+                f"({with_news / len(checked):.0%}) {span(with_news, len(checked))}"
+            )
+        else:
+            print("  с новостями после среза: не проверено (Google не ответил)")
+    def ratios_of(where: str, thick_only: bool) -> list[float]:
+        return [
+            float(r["во сколько раз"])
+            for r in rows
+            if r["где"] == where and not (thick_only and r["тонкая база"])
+        ]
+
+    # Справочно — по всем строкам, как считалось раньше: расхождение с основным числом
+    # больше интервала значит, что исход мерил «появилась ли работа», а не рост.
+    every_top, every_ctl = ratios_of("ТОП", False), ratios_of("контроль", False)
     _separation(
-        [float(r["во сколько раз"]) for r in rows if r["где"] == "ТОП"],
-        [float(r["во сколько раз"]) for r in rows if r["где"] == "контроль"],
+        ratios_of("ТОП", True),
+        ratios_of("контроль", True),
         folder,
         {
             "срез": cut.isoformat(),
             "горизонт": (horizon or date.today()).isoformat(),
             "срезы openalex": sorted(core_mod.SLICES or ()),
+            "мин. база": MIN_BASE,
+            "тонких строк": sum(r["тонкая база"] for r in rows),
+            "нулевых строк": sum(1 for r in rows if r["работ на срезе"] == 0),
+            "auc по всем строкам": round(_auc(every_top, every_ctl), 2)
+            if every_top and every_ctl
+            else None,
         },
     )
     print("")

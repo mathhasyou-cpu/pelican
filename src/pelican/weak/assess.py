@@ -29,8 +29,9 @@ LSTM выглядит новой, потому что по-новому назв
 
 ## Атомарные признаки (`JUDGMENTS`) — чтение свидетельств, а не вердикт
 
-Тем же вызовом модель отдаёт девять ПРОВЕРЯЕМЫХ по свидетельствам чтений: сколько
-компаний названо, есть ли раунд, есть ли продажи, назван ли лидер рынка и т.д. Это
+Тем же вызовом модель отдаёт двенадцать ПРОВЕРЯЕМЫХ по свидетельствам чтений: сколько
+компаний названо, есть ли раунд, есть ли продажи, назван ли лидер рынка, три вехи
+стадии и т.д. Это
 признаки для обучаемой модели этапа 1 ТЗ (`scripts/model_zoo.py`,
 `scripts/train_signal_model.py`): классификатор взвешивает их, а «по каким именно
 признакам» отвечает разложением коэффициентов (`weak/model.py`).
@@ -128,7 +129,16 @@ listed items only, never about what you know:
                          or regulation
   field_not_technology   the TECHNOLOGY name is a whole field, market or category
                          rather than one specific technology
-  novelty_claimed        any item presents it as new, first, novel or emerging"""
+  novelty_claimed        any item presents it as new, first, novel or emerging
+  prototype_built        any item shows a BUILT, working system: a demo, lab prototype,
+                         beta, open-source release or proof of concept - not only a
+                         design, theory or simulation
+  pilot_with_customer    any item names a SPECIFIC customer, partner or site where it
+                         is piloted, trialled or tested on real data - plans and
+                         intentions do not count
+  generally_available    any item shows it on general sale WITH paying customers or in
+                         production at customers - a funding round, a startup launch,
+                         a waitlist or an announcement alone does NOT count"""
 
 
 PAPER = "PAPER"
@@ -176,6 +186,11 @@ JUDGMENTS: tuple[tuple[str, type], ...] = (
     ("standard_or_regulation", bool),
     ("field_not_technology", bool),
     ("novelty_claimed", bool),
+    # Вехи стадии (`rubric.evidence_stage`): по одной на ступень, строже соседей выше —
+    # ⚠️ `commercial_deployment` и `pilot_mentioned` читает модель роста, их смысл не трогать.
+    ("prototype_built", bool),
+    ("pilot_with_customer", bool),
+    ("generally_available", bool),
 )
 JUDGMENT_NAMES: tuple[str, ...] = tuple(name for name, _ in JUDGMENTS)
 #: Потолок числа компаний: больше в пяти новостях не бывает, а модель с числом без

@@ -43,4 +43,5 @@ def query(conn: duckdb.DuckDBPyConnection, dsn: str, token: str, sql: str) -> li
 
 
 def _lit(text: str) -> str:
-    return "'" + text.replace("'", "''") + "'"
+    # NUL в строковом литерале обрывает запрос, а в text Postgres его хранить нельзя.
+    return "'" + text.replace("\x00", "").replace("'", "''") + "'"

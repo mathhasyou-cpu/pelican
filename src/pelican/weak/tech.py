@@ -54,8 +54,9 @@ from typing import Any
 import httpx
 
 from pelican.config import settings
-from pelican.store import Store
 from pelican.llm import Breaker, LLMClient, LLMError
+from pelican.store import Store
+from pelican.weak import asof
 from pelican.weak.core import significant
 
 PROPOSES = "proposes"
@@ -209,9 +210,36 @@ def clean_tech(raw: str) -> tuple[str, str]:
         return "", "одно слово: имя системы или категория"
     if len(tokens) > MAX_TECH_TOKENS:
         return "", "пересказ аннотации"
-    if tech.lower() in _TOO_BROAD:
+    if _too_broad(tech):
         return "", "категория, а не приём"
     return tech, ""
+
+
+#: Слова-обёртки: «machine learning methods», «deep learning models», «a machine-learning
+#: approach» — та же категория, что голое имя поля. ⚠️ Список — догадка, проверенная
+#: замером на приёмах `tech_mentions` (docs: `_too_broad`).
+_FILLER = frozenset(
+    {
+        "method", "methods", "model", "models", "approach", "approaches", "technique",
+        "techniques", "algorithm", "algorithms", "framework", "frameworks", "based",
+        "using", "with", "via", "for", "of", "the", "a", "an", "and", "application",
+        "applications", "tool", "tools", "system", "systems", "integration", "use",
+    }
+)
+
+
+def _too_broad(tech: str) -> bool:
+    """Категория вместо приёма — по НОРМАЛИЗОВАННОЙ форме, а не точной строкой.
+
+    Точной строкой «machine learning» снималось, а «machine learning methods» и
+    «machine-learning approach» проходили как приём, становились ядрами с огромным следом,
+    и фильтр зонтиков ниже их не снимал, если слова запроса другие (PEL-C-03). Дефис —
+    пробел, слова-обёртки (`_FILLER`) выбрасываются, остаток сверяется со словарём.
+    Замер на 5843 разных приёмах `tech_mentions`: снимает 7 («deep learning models»,
+    «machine learning techniques», «blockchain technique»…), ложных снятий нет.
+    """
+    words = [w for w in re.split(r"[\s\-/]+", tech.lower()) if w and w not in _FILLER]
+    return " ".join(words) in _TOO_BROAD
 
 
 #: Слова рынка: они называют не механизм, а полку в магазине. ⚠️ Список — догадка,
@@ -298,6 +326,33 @@ def same_head(sent: str, echoed: str) -> bool:
     return a.startswith(b) or b.startswith(a)
 
 
+def _realign(items: list, batch: list[Pending], stats: TechStats) -> list:
+    """Элементы ответа в порядке входов пакета.
+
+    ⚠️ Совпадение эха с ЧУЖИМ входом того же пакета — улика СДВИГА РАСКЛАДКИ, а не вольного
+    пересказа: structured output фиксирует число элементов, но не порядок. Приём,
+    разложенный по позиции, записался бы чужой работе в `tech_mentions` навсегда — работа
+    считается размеченной и больше не перечитывается (PEL-A-01). Поэтому: эхо однозначно
+    указывает на вход у каждого элемента — переставляем по нему (эхо для этого и
+    заведено); не указывает — пакет отвергается, и очередь вернёт его работы.
+    """
+    hits = [
+        [j for j, src in enumerate(batch) if same_head(src.echo, str(got.get("head", "")))]
+        for got in items
+    ]
+    swapped = sum(1 for i, h in enumerate(hits) if h and i not in h)
+    if not swapped:
+        return items
+    stats.echo_swap += swapped
+    targets = [h[0] for h in hits if len(h) == 1]
+    if len(targets) != len(batch) or len(set(targets)) != len(batch):
+        raise ValueError(f"сдвиг раскладки: {swapped} элементов с чужим эхом, переставить нельзя")
+    out: list = [None] * len(batch)
+    for got, h in zip(items, hits, strict=True):
+        out[h[0]] = got
+    return out
+
+
 def parse_batch(payload: dict[str, Any], batch: list[Pending], stats: TechStats) -> list[Named]:
     items = payload.get("items")
     if not isinstance(items, list) or len(items) != len(batch):
@@ -305,17 +360,11 @@ def parse_batch(payload: dict[str, Any], batch: list[Pending], stats: TechStats)
         # Пакет отвергается целиком — очередь его вернёт.
         raise ValueError(f"ожидали {len(batch)} элементов, пришло {len(items or [])}")
 
+    items = _realign(items, batch, stats)
     out: list[Named] = []
     for source, got in zip(batch, items, strict=True):
-        echoed = str(got.get("head", ""))
-        if not same_head(source.echo, echoed):
+        if not same_head(source.echo, str(got.get("head", ""))):
             stats.echo_drift += 1
-            # ⚠️ Совпадение с ЧУЖИМ входом того же пакета — это улика СДВИГА
-            # РАСКЛАДКИ, а не вольного пересказа, и различать их обязательно:
-            # первое приписывает приём чужой работе, второе безобидно. Тот же
-            # счётчик и по той же причине заведён в `mine` (`echo_swap`).
-            if any(other is not source and same_head(other.echo, echoed) for other in batch):
-                stats.echo_swap += 1
         role = str(got.get("role") or NONE)
         tech, reason = clean_tech(str(got.get("tech") or ""))
 
@@ -335,11 +384,9 @@ def parse_batch(payload: dict[str, Any], batch: list[Pending], stats: TechStats)
     return out
 
 
-#: Горизонт очереди. ⚠️ Свой, а не `text.QUEUE_RETRY_DAYS` (180 дней), и это не
-#: описка: у болей полгода — граница, за которой «этим болеют сейчас» уже
-#: неправда, а приём живёт годами, и ряд под ось роста нужен длинный. Верхняя
-#: граница здесь — покрытие векторов (`emb-science/state.json`, 2023-07-27):
-#: глубже привязка всё равно не работает.
+#: Горизонт очереди при дренаже БЕЗ `ids` (`weak_dataset_tag.py`, ручной прогон): приём
+#: живёт годами, и ряд под ось роста нужен длинный, но читать моделью весь корпус
+#: незачем. ⚠️ Догадка. Найденное поиском размечается без горизонта (`_run`).
 QUEUE_DAYS = 760
 
 ProgressHook = Callable[[int, Exception | None], None] | None
@@ -421,11 +468,19 @@ async def _run(
 ) -> tuple[list[Named], TechStats]:
     stats = TechStats()
     model = settings.llm_model
+    # ⚠️ Горизонт — от «сегодня» среза (`weak.asof`), а не от часов машины: под срезом
+    # 2017 года иначе ни одна найденная работа не попадала в очередь, и научный поток
+    # ретро-теста молча давал ноль названных работ (docs/todo.md §115).
+    now = datetime.combine(asof.today(), datetime.min.time(), tzinfo=UTC)
+    # ⚠️ Найденное поиском (`ids`) размечается целиком: поиск уже выбрал эти работы, и
+    # горизонт молча выбрасывал из научного потока всё старше двух лет — работа найдена,
+    # а приёма у неё нет, и в кандидаты она не идёт (PEL-B-01). Горизонт — для дренажа
+    # всей очереди, где без него модель читала бы весь корпус.
     pending = [
         Pending(signal_id=sid, text=text)
         for sid, text in store.untagged_science(
             model,
-            since=datetime.now(UTC) - timedelta(days=QUEUE_DAYS),
+            since=None if ids is not None else now - timedelta(days=QUEUE_DAYS),
             limit=limit,
             ids=ids,
         )

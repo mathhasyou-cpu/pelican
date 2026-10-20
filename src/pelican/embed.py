@@ -55,10 +55,12 @@ def embed(
     out: list[list[float]] = []
     for start in range(0, len(texts), batch_size):
         chunk = texts[start : start + batch_size]
+        base = settings.embedding_base_url or settings.llm_base_url
+        key = settings.embedding_api_key or settings.llm_api_key
         response = client.post(
-            settings.llm_base_url.rstrip("/") + EMBEDDINGS_PATH,
+            base.rstrip("/") + EMBEDDINGS_PATH,
             json={"model": model, "input": list(chunk)},
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+            headers={"Authorization": f"Bearer {key}"},
         )
         response.raise_for_status()
         # Порядок ответа контрактом не гарантирован, зато есть index.

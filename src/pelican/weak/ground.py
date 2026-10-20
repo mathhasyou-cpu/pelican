@@ -31,8 +31,8 @@ import httpx
 import numpy as np
 
 from pelican.config import EMB_DIR, settings
-from pelican.store import Store
 from pelican.embed import embed
+from pelican.store import Store
 from pelican.weak import asof
 from pelican.weak.corpus import future_ids, junk_ids
 from pelican.weak.shards import ShardCorpus, top_k
@@ -42,6 +42,10 @@ log = logging.getLogger("pelican.ground")
 #: Потолок одного прохода на сервере шардов. Нативный проход — ~60 с (docs/weak-demo.md
 #: §3); запас на холодный диск и на соседний проход, ждущий замка. ⚠️ Догадка.
 REMOTE_TIMEOUT_S = 600.0
+#: Соединение с сервером шардов: живой хост на локальной сети отвечает за миллисекунды, и
+#: молчащий порт (сон машины, фильтр) должен откатываться на свой проход сразу, а не через
+#: `REMOTE_TIMEOUT_S`. ⚠️ Догадка.
+REMOTE_CONNECT_S = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,10 +101,10 @@ def nearest(
 def _remote(matrix: np.ndarray, k: int, as_of: date | None) -> tuple[np.ndarray, np.ndarray] | None:
     """Тот же проход в нативном `pelican.shard_server` (docs/weak-demo.md §3).
 
-    ⚠️ Не запущен сервер — `None`, и проход идёт здесь же, через bind mount: втрое
-    медленнее, но запрос не падает. Предупреждение в логе — чтобы это было видно.
-    Любой другой отказ (таймаут, 5xx) — исключение: повторный проход здесь удвоил бы
-    время запроса молча.
+    ⚠️ Не запущен сервер или хост не отвечает на соединение — `None`, и проход идёт здесь
+    же, через bind mount: втрое медленнее, но запрос не падает. Предупреждение в логе —
+    чтобы это было видно. Отказ ПОСЛЕ соединения (таймаут чтения, 5xx) — исключение:
+    сервер уже считал, и повторный проход здесь удвоил бы время запроса молча.
     """
     q = np.ascontiguousarray(matrix, dtype=np.float32)
     body = {
@@ -110,8 +114,12 @@ def _remote(matrix: np.ndarray, k: int, as_of: date | None) -> tuple[np.ndarray,
         "as_of": as_of.isoformat() if as_of else None,
     }
     try:
-        r = httpx.post(f"{settings.shards_url.rstrip('/')}/top_k", json=body, timeout=REMOTE_TIMEOUT_S)
-    except httpx.ConnectError:
+        r = httpx.post(
+            f"{settings.shards_url.rstrip('/')}/top_k",
+            json=body,
+            timeout=httpx.Timeout(REMOTE_TIMEOUT_S, connect=REMOTE_CONNECT_S),
+        )
+    except (httpx.ConnectError, httpx.ConnectTimeout):
         log.warning("сервер шардов %s недоступен — прохожу шарды сам", settings.shards_url)
         return None
     r.raise_for_status()

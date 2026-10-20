@@ -27,6 +27,14 @@ class LLMError(RuntimeError):
     """Ответ пришёл, но пользоваться им нельзя: 4xx, не-JSON, пустой выбор."""
 
 
+class LLMTruncated(LLMError):
+    """Ответ обрезан потолком `max_tokens` (`finish_reason == "length"`).
+
+    Отдельный класс, потому что лечится он иначе, чем остальные: повтором с большим
+    потолком, а не отказом. Неполный JSON без этой метки неотличим от мусора.
+    """
+
+
 # Ретраим только сеть и 5xx.
 #
 # ⚠️ ReadTimeout сюда не входит намеренно. Сервер выполняет запросы строго по
@@ -141,7 +149,8 @@ class LLMClient:
                 "json_schema": {"name": name, "strict": True, "schema": schema},
             },
         }
-        if self.reasoning_effort is not None:
+        # Пусто — поле не шлётся: облачные модели без reasoning (sonar) его не ждут.
+        if self.reasoning_effort:
             body["reasoning_effort"] = self.reasoning_effort
         # Потолок задаётся на вызов, а не на клиента: в пакетных стадиях ответ
         # повторяет вход эхом, поэтому единственно верного числа для всех
@@ -175,6 +184,8 @@ class LLMClient:
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as exc:
+            if choices[0].get("finish_reason") == "length":
+                raise LLMTruncated(f"ответ обрезан потолком токенов: {content[-200:]}") from exc
             raise LLMError(f"не JSON вопреки схеме: {content[:300]}") from exc
         if not isinstance(parsed, dict):
             raise LLMError(f"ожидался объект, пришло {type(parsed).__name__}")

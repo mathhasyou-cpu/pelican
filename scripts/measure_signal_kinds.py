@@ -58,7 +58,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 sys.stdout = _io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+from pelican import locks  # noqa: E402
 from pelican.config import settings  # noqa: E402
+from pelican.runner import MODEL_LOCK  # noqa: E402
 from pelican.store import Store  # noqa: E402
 from pelican.weak.ask import NEWS_PER_CARD, _age_share  # noqa: E402
 from pelican.weak.assess import (  # noqa: E402
@@ -336,9 +338,10 @@ def main() -> None:
     )
     ap.add_argument(
         "--evidence",
-        choices=("papers", "mixed", "corpus"),
+        choices=("papers", "mixed", "corpus", "issue"),
         default="papers",
-        help="papers — только работы; mixed — работы и новости; corpus — mixed + след корпуса",
+        help="papers — только работы; mixed — работы и новости; corpus — mixed + след корпуса; "
+        "issue — состав выдачи: 5 новостей + 2 работы + след (PEL-E-05)",
     )
     ap.add_argument(
         "--features-out",
@@ -362,15 +365,25 @@ def main() -> None:
         help="только патентная ось: перевод, ядра, OPS — без привязки, новостей и оценки",
     )
     args = ap.parse_args()
-    out_path = OUT.with_name(f"weak-assess-{args.evidence}.tsv")
+    # ⚠️ Замер другой моделью (sonar — «локальная против облачной») пишется в СВОЙ файл:
+    # иначе он перезаписал бы замер локальной модели, на котором стоят числа отчёта.
+    default_model = type(settings).model_fields["llm_model"].default
+    tag = "" if settings.llm_model == default_model else "-" + settings.llm_model.replace("/", "_")
+    out_path = OUT.with_name(f"weak-assess-{args.evidence}{tag}.tsv")
     if Path(args.controls_file) != CONTROLS:
         # ⚠️ Трудный контроль пишется в СВОЙ файл и объявляется отдельным числом:
         # усреднять его с лёгким нельзя, иначе честная цифра растворяется.
-        out_path = OUT.with_name(f"weak-assess-{args.evidence}-{Path(args.controls_file).stem}.tsv")
+        out_path = OUT.with_name(
+            f"weak-assess-{args.evidence}-{Path(args.controls_file).stem}{tag}.tsv"
+        )
 
     pos = read_tsv(POSITIVES)
     controls_path = Path(args.controls_file)
     ctl = read_tsv(controls_path)
+    if not ctl:
+        # ⚠️ Пустой контроль — не «специфичность 1.00», а отсутствие замера: файл трудного
+        # контроля по замыслу пуст, пока рука не разметила `precision_pairs.tsv` (PEL-G-08).
+        raise SystemExit(f"{controls_path}: ни одной строки контроля — замерять нечем")
     if args.limit:
         pos = pos[: args.limit]
     if args.controls:
@@ -629,4 +642,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Модель одна на стенд (NFR-26): исполнитель API держит тот же замок — «занято» = код 75.
+    try:
+        with locks.hold(MODEL_LOCK):
+            main()
+    except locks.Busy as exc:
+        print(f"занято: {exc}")
+        sys.exit(75)

@@ -16,8 +16,7 @@
     python scripts/verify_science_corpus.py --source openalex --years 5
     python scripts/verify_science_corpus.py --source arxiv
 
-⚠️ В БД ничего не пишется: открывается `settings.storage_target`, то есть
-сервер `trends serve`, если он настроен.
+⚠️ В БД ничего не пишется: открывается `settings.storage_target` (Postgres корпуса).
 """
 
 from __future__ import annotations
@@ -39,12 +38,12 @@ for stream in (sys.stdout, sys.stderr):
 import httpx  # noqa: E402
 
 from pelican.config import settings  # noqa: E402
-from pelican.store import Store  # noqa: E402
 from pelican.sources.arxiv import API_URL as ARXIV_URL  # noqa: E402
 from pelican.sources.arxiv import DELAY_S as ARXIV_DELAY  # noqa: E402
 from pelican.sources.arxiv import ArXiv, _window, total_results  # noqa: E402
 from pelican.sources.openalex import API_URL as OPENALEX_URL  # noqa: E402
 from pelican.sources.openalex import DELAY_S as OPENALEX_DELAY  # noqa: E402
+from pelican.store import Store  # noqa: E402
 
 #: Расхождение, ниже которого месяц считается собранным. Собранные месяцы у нас
 #: расходятся с API на 0.0-0.2% (работа доезжает в индекс и после сбора).
@@ -198,7 +197,7 @@ def refill_commands(scope: str, holes: list[tuple[date, date]], today: date) -> 
             end = min(depth, skip + CHUNK_DAYS)
             out.append(
                 f"$env:OPENALEX_FILTERS='{scope}'; "
-                f"trends backfill -s openalex --skip-days {skip} -d {end}"
+                f"python -m pelican.collect -s openalex --skip-days {skip} --days {end}"
             )
             skip = end
     return out
@@ -286,7 +285,8 @@ def main() -> None:
 
     today = datetime.now(UTC).date()
     since = today - timedelta(days=round(args.years * 365.25))
-    store = Store(settings.storage_target, read_only=True)
+    # Только чтение — по построению: скрипт не вызывает ни одного метода записи `Store`.
+    store = Store(settings.storage_target)
     commands: list[str] = []
     with store, httpx.Client(timeout=60.0, headers={"User-Agent": "trends-anal"}) as http:
         if args.source in ("all", "openalex"):

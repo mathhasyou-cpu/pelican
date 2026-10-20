@@ -21,7 +21,7 @@ from pelican.weak.rubric import (
     PILOT,
     PROTOTYPE,
     STAGES,
-    explain,
+    evidence_stage,
     parse_stage,
     parse_trend,
     score,
@@ -35,6 +35,20 @@ def test_stage_floor_follows_what_the_evidence_reads() -> None:
     assert stage_floor(PROTOTYPE, {"pilot_mentioned": 1.0}) == PILOT
     assert stage_floor(EARLY, {"pilot_mentioned": 1.0}) == EARLY  # не понижает
     assert stage_floor(CONCEPT, {"funding_mentioned": 1.0}) == CONCEPT  # раунд — не внедрение
+
+
+def test_evidence_stage_climbs_the_ladder_of_milestones() -> None:
+    """Ступень — старшая прочитанная веха, в том числе НИЖЕ выбора модели."""
+    no = {"prototype_built": 0.0, "pilot_with_customer": 0.0, "generally_available": 0.0}
+    assert evidence_stage(EARLY, no) == CONCEPT
+    assert evidence_stage(EARLY, {**no, "prototype_built": 1.0}) == PROTOTYPE
+    both = {**no, "prototype_built": 1.0, "pilot_with_customer": 1.0}
+    assert evidence_stage(CONCEPT, both) == PILOT
+    assert evidence_stage(CONCEPT, {**both, "generally_available": 1.0}) == EARLY
+    # старые продажи без вех не поднимают: решает лестница, а не `commercial_deployment`
+    assert evidence_stage(EARLY, {**no, "commercial_deployment": 1.0}) == CONCEPT
+    # оценка старого формата (вех нет) — прежний пол
+    assert evidence_stage(CONCEPT, {"commercial_deployment": 1.0}) == EARLY
 
 DATASET = Path(__file__).resolve().parents[1] / "scripts" / "weak_signals_100.tsv"
 
@@ -94,10 +108,6 @@ def test_score_rejects_unknown() -> None:
         score("зрелость", GROWING)
     with pytest.raises(ValueError):
         score(PILOT, "падает")
-
-
-def test_explain_shows_the_arithmetic() -> None:
-    assert explain(PILOT, FAST) == "Пилот (3) + Растёт быстро (3) = 6"
 
 
 def test_rubric_reproduces_98_of_100() -> None:

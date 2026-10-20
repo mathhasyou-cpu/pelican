@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime
@@ -79,9 +80,9 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from pelican import locks  # noqa: E402
 from pelican.config import EMB_DIR, settings  # noqa: E402
-from pelican.store import Store  # noqa: E402
-from pelican.llm.client import with_retries  # noqa: E402
 from pelican.embed import embed  # noqa: E402
+from pelican.llm.client import with_retries  # noqa: E402
+from pelican.store import Store  # noqa: E402
 
 #: Источники, которые копят корпус и в конвейер не входят.
 SOURCES = ("arxiv", "openalex")
@@ -199,13 +200,18 @@ def flush(
             "since": np.array(since.date().isoformat()),
             "until": np.array(until.date().isoformat()),
         }
-    np.savez(
-        out,
-        model=np.array(settings.embedding_model),
-        ids=np.array(ids, dtype=np.int64),
-        vectors=np.asarray(vectors, dtype=np.float16),
-        **extra,
-    )
+    # Через временное имя и `os.replace`: проход по шардам идёт параллельно с докачкой и
+    # иначе открыл бы недописанный zip. `.npz.tmp` маской `shard-*.npz` не находится.
+    tmp = out.with_name(out.name + ".tmp")
+    with tmp.open("wb") as fh:
+        np.savez(
+            fh,
+            model=np.array(settings.embedding_model),
+            ids=np.array(ids, dtype=np.int64),
+            vectors=np.asarray(vectors, dtype=np.float16),
+            **extra,
+        )
+    os.replace(tmp, out)
     return out
 
 

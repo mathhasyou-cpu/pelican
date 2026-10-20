@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from pelican.store import Store
 from pelican.sources.base import Signal
+from pelican.store import Store
 from pelican.weak.tech import (
     PROPOSES,
     REVIEWS,
@@ -100,8 +100,8 @@ def test_parse_batch_counts_roles_and_empties() -> None:
     assert stats.echo_drift == 0 and stats.echo_swap == 0
 
 
-def test_parse_batch_flags_layout_shift() -> None:
-    """Эхо чужого входа того же пакета — улика сдвига раскладки, а не пересказа."""
+def test_parse_batch_realigns_layout_shift_by_echo() -> None:
+    """Эхо чужого входа того же пакета — сдвиг раскладки: приём идёт СВОЕЙ работе (PEL-A-01)."""
     batch = _pending(
         "Large Kernel Modulation Network for Efficient Image Super-Resolution",
         "Collective rising dynamics of four bubbles under surface tension",
@@ -121,9 +121,40 @@ def test_parse_batch_flags_layout_shift() -> None:
         ]
     }
     stats = TechStats()
-    parse_batch(payload, batch, stats)
-    assert stats.echo_drift == 2
-    assert stats.echo_swap == 2
+    got = parse_batch(payload, batch, stats)
+    assert stats.echo_swap == 2 and stats.echo_drift == 0
+    assert [(n.signal_id, n.tech) for n in got] == [
+        (batch[0].signal_id, "large kernel modulation network"),
+        (batch[1].signal_id, "adaptive refinement sph"),
+    ]
+
+
+def test_too_broad_by_normalized_form() -> None:
+    """«machine learning methods» и «machine-learning approach» — та же категория (PEL-C-03)."""
+    from pelican.weak.tech import clean_tech
+
+    for label in ("machine learning methods", "Machine-learning approach", "deep learning models"):
+        assert clean_tech(label) == ("", "категория, а не приём"), label
+    assert clean_tech("federated learning methods")[0] == "federated learning methods"
+
+
+def test_parse_batch_rejects_shift_it_cannot_undo() -> None:
+    """Один элемент с чужим эхом, другой без узнаваемого эха — переставить нельзя, пакет
+    отвергается целиком и вернётся в очередь."""
+    import pytest
+
+    batch = _pending(
+        "Large Kernel Modulation Network for Efficient Image Super-Resolution",
+        "Collective rising dynamics of four bubbles under surface tension",
+    )
+    payload = {
+        "items": [
+            {"head": "Collective rising dynamics of four bubbles", "tech": "a b", "role": "uses"},
+            {"head": "something else entirely here", "tech": "c d", "role": "uses"},
+        ]
+    }
+    with pytest.raises(ValueError, match="сдвиг раскладки"):
+        parse_batch(payload, batch, TechStats())
 
 
 def test_parse_batch_rejects_wrong_length() -> None:
@@ -221,39 +252,15 @@ def test_queue_by_ids_and_resume(store: Store) -> None:
     store.save_tech("m-ir", [(all_ids[0], "automated red teaming", "proposes")])  # идемпотентно
     left = [row[0] for row in store.untagged_science("m-ir", since=NOW - timedelta(days=30))]
     assert left == [all_ids[1]]
-    assert dict(store.tech_counts("m-ir")) == {"proposes": 1}
+    rows = store.conn.execute("SELECT role FROM tech_mentions WHERE model = 'm-ir'").fetchall()
+    assert [r[0] for r in rows] == ["proposes"]
 
 
-def test_distinct_techs_keeps_roles_apart(store: Store) -> None:
-    store.insert_signals([_sci("arxiv", f"dr-a{i}", text=f"{LONG} {i}") for i in range(3)])
-    ids = [row[0] for row in store.untagged_science("m-dr", since=NOW - timedelta(days=30))]
-    store.save_tech(
-        "m-dr",
-        [
-            (ids[0], "event-based vision sensors", "proposes"),
-            (ids[1], "event-based vision sensors", "uses"),
-            (ids[2], "event-based vision sensors", "reviews"),
-        ],
-    )
-    assert store.distinct_techs("m-dr") == [("event-based vision sensors", 1, 1, 1)]
-
-
-def test_daily_counts_drop_january_first(store: Store) -> None:
-    """1 января у openalex — заглушка вместо даты, а не наблюдение."""
-    stub = datetime(2025, 1, 1, tzinfo=UTC)
-    real = datetime(2025, 1, 2, tzinfo=UTC)
-    store.insert_signals(
-        [
-            _sci("openalex", "jf-stub", text=LONG + " stub", when=stub),
-            _sci("openalex", "jf-real", text=LONG + " real", when=real),
-        ]
-    )
-    ids = [row[0] for row in store.untagged_science("m-jf", since=datetime(2024, 1, 1, tzinfo=UTC))]
-    store.save_tech("m-jf", [(i, "memory poisoning defense", "proposes") for i in ids])
-
-    days = [row[2] for row in store.tech_daily_counts("m-jf")]
-    assert len(days) == 1
-    assert days[0].month == 1 and days[0].day == 2
+def test_queue_without_horizon_takes_old_work(store: Store) -> None:
+    """`since=None` — работа пятилетней давности тоже в очереди (PEL-B-01)."""
+    store.insert_signals([_sci("arxiv", "oh-old", when=NOW - timedelta(days=5 * 365))])
+    assert store.untagged_science("m-oh", since=NOW - timedelta(days=30)) == []
+    assert len(store.untagged_science("m-oh", since=None)) == 1
 
 
 def test_market_category_has_nothing_beyond_the_query() -> None:

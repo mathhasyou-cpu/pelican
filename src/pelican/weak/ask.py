@@ -18,12 +18,15 @@
 7. **углубление** показанных — аннотации работ и фактовые заголовки (`weak.deepen`);
 8. **карточка** по-русски — только по свидетельствам, с датами и числами (`weak.card`).
 
-## Уверенность — доля пройденных проверок, а не вероятность
+## Уверенность — вероятность модели роста; проверки — качество свидетельств
 
 ТЗ просит «скоринг — уверенность модели» и счёт сигналов «с уверенностью выше 75%».
-Откалибровать вероятность не на чем: у заказчика нет отрицательных примеров, а наш
-контрольный набор размечен нами. Поэтому уверенность здесь — **доля из пяти
-именованных проверок**, и каждая показывается в карточке как предиктор:
+Уверенность — **вероятность модели роста** `weak/growth.json` (`score`; текст для
+пользователя — `page.HINTS["confidence"]`). Без модели (`score` вернул `False`)
+уверенность — доля пройденных проверок.
+
+Проверки — «качество свидетельств» (`page.HINTS["evidence"]`), каждая показывается в
+карточке:
 
 | проверка | что значит |
 |---|---|
@@ -33,8 +36,6 @@
 | научная опора | ≥ 2 работ, в тексте которых стоит ядро технологии |
 | объяснение со ссылками | вывод модели ссылается на номера свидетельств |
 
-«Выше 75%» тогда значит «пройдено не меньше четырёх из пяти» — и это проверяемо.
-
 ⚠️ **Проверка, проходящая по построению, — не проверка.** Прежние «≥2 работы корпуса» и
 «есть источник выше пониженной доверенности» срабатывали почти у всех: работы мы сами
 кладём по две, а неизвестный домен по правилу ТЗ считается средним. В одном прогоне 11
@@ -42,9 +43,11 @@
 Правило: на пуле каждая проверка обязана давать и «да», и «нет» (печатает
 `scripts/measure_ask.py`); срабатывающая больше чем у 90% — заменяется.
 
-## Порядок ТОП — шанс попасть в список заказчика, а не уверенность
+## Порядок ТОП — по уверенности
 
-В ТОП идёт всё, кроме `noise`. Сортировка: «за направлением кто-то стоит» → **модель
+В ТОП идёт только `emerging` (`Signal.shown`), прошедший проверку соответствия запросу
+(`_on_topic`). Порядок — уверенность модели роста, при равенстве и без модели — `top_key`:
+«за направлением кто-то стоит» → **модель
 списка заказчика** (`weak/listed.json`, метка «вошёл в список методолога 2026» на трёх
 срезах бэктеста; docs/weak-audit.md) → запасной ключ **доля работ ядра за последний год**
 → число независимых игроков → видимость ниже медианы пула (перцентиль у BERTrend) →
@@ -60,23 +63,30 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 import httpx
 
+from pelican import events
 from pelican.config import settings
-from pelican.store import Store
-from pelican.llm import LLMClient, LLMError
 from pelican.embed import THRESHOLD, build_groups
-from pelican.weak import asof
+from pelican.llm import LLMClient, LLMError, LLMTruncated
+from pelican.store import Store
+from pelican.weak import asof, flags, onpoint, rounds, topic, twins
+from pelican.weak import burst as burst_mod
 from pelican.weak import card as card_mod
 from pelican.weak import deepen as deepen_mod
+from pelican.weak import extra as extra_mod
+from pelican.weak import layers as layers_mod
 from pelican.weak import model as model_mod
 from pelican.weak import patents as patents_mod
-from pelican.weak import rounds, topic, twins
+from pelican.weak import technique as technique_mod
 from pelican.weak.assess import CODE, CORPUS, NEWS, PAPER, Candidate, Evidence
+from pelican.weak.assess import EVIDENCE as ASSESS_EVIDENCE
 from pelican.weak.assess import SYSTEM_PROMPT as ASSESS_PROMPT
 from pelican.weak.assess import build_prompt as assess_prompt
 from pelican.weak.assess import parse as assess_parse
@@ -87,11 +97,13 @@ from pelican.weak.core import (
     corpus_line,
     footprints,
     industry_share,
+    names_core,
     significant,
 )
 from pelican.weak.dataset import (
     ARM_EVIDENCE,
     EMBED_FEATURES,
+    FEATURE_LABELS,
     JUDGMENT_FEATURES,
     Row,
     _share,
@@ -103,17 +115,18 @@ from pelican.weak.dataset import (
 )
 from pelican.weak.ground import ground
 from pelican.weak.group import vectors_for
-from pelican.weak.kinds import EMERGING, NOISE
+from pelican.weak.kinds import EMERGING, MATURE, NOISE, TOO_BROAD
 from pelican.weak.kinds import label_of as kind_label
-from pelican.weak.live import LiveDoc, news_many
+from pelican.weak.live import LiveDoc, news_many_measured
 from pelican.weak.live import search as live_search
 from pelican.weak.model import PLAYERS_CAP, SHARE_PRIOR_WEIGHT
 from pelican.weak.money import candidates as money_candidates
-from pelican.weak.rubric import stage_floor
 from pelican.weak.money import companies_of
 from pelican.weak.money import queries as money_queries
 from pelican.weak.neighbours import neighbourhoods
+from pelican.weak.rubric import evidence_stage
 from pelican.weak.tech import MARKET_WORDS, is_category, query_words, run_tech
+from pelican.weak.tech import _too_broad as too_broad
 from pelican.weak.trust import (
     ASSOCIATION,
     GOV,
@@ -128,10 +141,12 @@ from pelican.weak.trust import (
 )
 
 TOP = 15
-#: Поднимается, когда меняется СОДЕРЖИМОЕ выдачи (не вёрстка — её `/r/{name}` перестраивает
-#: и так): отчёты прошлых версий кэш повторов больше не отдаёт (`jobs.cached_report`).
+#: Поднимается, когда меняется СОДЕРЖИМОЕ выдачи (не вёрстка — её интерфейс строит
+#: из JSON сам): отчёты прошлых версий кэш повторов больше не отдаёт (`jobs.cached_report`).
 #: 1 — тематичность, стадия, гипотеза, доверенность, русские названия исключённых.
-REPORT_VERSION = 1
+#: 2 — исправления по ревью: состав свидетельств оценки, разметка найденного без горизонта,
+#: след корпуса, денежный поток.
+REPORT_VERSION = 2
 #: Спрашивать ли первым кругом денежного потока подрынки области (см. `expand`).
 #: Выключатель нужен замеру A/B (`scripts/measure_ask.py --no-submarkets`).
 SUBMARKETS = True
@@ -140,8 +155,18 @@ SUBMARKETS = True
 #: неё на том же пуле (22 строки списка против 23, docs/weak-audit.md), а стоит 210–390 с на запрос
 #: (медиана 240; проход по шардам, денежный след, первый запрос дня платит ещё и маски окон)
 #: при потолке заказчика в 1200 с. Включается замером:
-#: `WEAK_LISTED_IN_ASK=1` или `scripts/measure_ask.py --with-listed`.
-LISTED_IN_ASK = bool(os.getenv("WEAK_LISTED_IN_ASK"))
+#: `WEAK_LISTED_IN_ASK=1` (`weak/flags.py`) или `scripts/measure_ask.py --with-listed`.
+#: Имя модуля остаётся: его подменяют замер и тесты.
+LISTED_IN_ASK = flags.LISTED_IN_ASK
+#: Бюджет времени запроса, с. Потолок заказчика — 1200 с; запас — на сохранение отчёта и
+#: опрос статуса. ⚠️ Догадка, не замер (docs/todo.md).
+BUDGET_S = float(os.getenv("WEAK_BUDGET_S", "1100"))
+#: Сколько оставить карточкам: 208–258 с на 15 сигналов (docs/weak-demo.md). Патенты и
+#: углубление идут, только пока после них остаётся столько; карточки — продукт и идут всегда.
+CARDS_RESERVE_S = 260.0
+#: Меньше этого остатка до резерва карточек углубление не начинается: аннотации arXiv и
+#: OpenAlex на 15 сигналов — десятки секунд. ⚠️ Догадка.
+DEEPEN_MIN_S = 60.0
 
 #: Метка патентного свидетельства в карточке. ⚠️ В промпт зрелости она НЕ попадает:
 #: патенты добираются после оценки, и состав свидетельств `assess` остаётся замеренным.
@@ -149,6 +174,7 @@ PATENT_EV = "PATENT"
 #: Работ на фасет. ⚠️ Догадка: 6 фасетов × 30 = 180 работ.
 PER_FACET = 30
 #: Кандидатов, которых доводим до оценки. Больше ТОП-15, потому что часть уйдёт в отсев.
+#: ⚠️ Догадка, не замер (docs/todo.md).
 CANDIDATES = 45
 #: Сколько ярлыков сводить к ядру. ⚠️ Догадка: ~1 с модели на 12 ярлыков.
 CORE_POOL = 80
@@ -181,11 +207,15 @@ INDEPENDENT_KINDS = frozenset({SCIENCE, PREPRINT, GOV, UNIVERSITY, ASSOCIATION, 
 #: за каждое свидетельство. Замер доли непроверяемых компаний — `measure_card_facts.py`.
 EXTRA_FOR_COMPANIES = 3
 #: Сколько работ привязывается к денежному кандидату для проверки научной опоры.
+#: ⚠️ Догадка, не замер (docs/todo.md).
 PAPERS_FOR_CHECK = 4
 
 #: ⚠️ ДОГАДКИ (docs/todo.md §63): тренд.
 
 ProgressHook = Callable[[str], None] | None
+#: Хук структурных событий прогона: (вид, данные). Контракт и этапы — `pelican.events`;
+#: их проигрывает экран ожидания веб-интерфейса. Строки `say()` остаются.
+EventHook = Callable[[str, dict], None] | None
 
 EXPAND_PROMPT = """The user asks, in Russian, for emerging technologies in some area.
 First decide what the SUBJECT is: the thing the user actually named, in their own
@@ -274,6 +304,14 @@ class Check:
     #: признака. Из-за двух таких проверок уверенность принимала ровно три значения
     #: (0.6 / 0.8 / 1.0) и кандидатов почти не различала (docs/todo.md §72).
     entry: bool = False
+    #: Идёт ли в долю проверок. «Несколько игроков» — подпись: условием ТОП не является
+    #: (`MIN_PLAYERS`), но и в долю не идёт — по тому же замеру §72.
+    scored: bool = True
+
+    @property
+    def counted(self) -> bool:
+        """В долю проверок: не условие входа и не подпись."""
+        return self.scored and not self.entry
 
 
 @dataclass(slots=True)
@@ -316,11 +354,6 @@ class Signal:
     #: Атомарные чтения свидетельств из той же оценки (`assess.JUDGMENTS`) — признаки `J`
     #: обученной модели; приезжают с оценкой, лишних вызовов не стоят.
     judgments: dict[str, float] = field(default_factory=dict)
-    #: Модель роста (`weak/growth.json`): шанс, что след ядра вырастет сверх базового уровня
-    #: за два года, и три её главных вклада. `None` — модели нет. ⚠️ Это прогноз РОСТА
-    #: ПУБЛИКАЦИЙ, не денег (docs/weak-audit.md); в порядок ТОП не входит.
-    growth: float | None = None
-    growth_predictors: list[str] = field(default_factory=list)
     #: Модель списка заказчика (`weak/listed.json`): шанс, что направление войдёт в список
     #: методолога, и три её главных вклада — ПЕРВЫЙ ключ порядка ТОП (после нулевого).
     #: `None` — модели нет или не посчиталось; тогда порядок — по `core_recent_share`.
@@ -345,6 +378,28 @@ class Signal:
     #: `None` — не оценивалось (старые отчёты, сбой проверки).
     relevance: int | None = None
     relevance_why: str = ""
+    #: Дословная опора объяснения из источника (`card.Card.why_quote`); пусто — не сверена.
+    why_quote: str = ""
+    #: Новостной поиск по кандидату не ответил и после повтора (`live.news_many_measured`):
+    #: «новостей нет» у такого кандидата — не измерение (три исхода, как `check_state` у
+    #: copycat).
+    news_unmeasured: bool = False
+    #: Патентных публикаций по ядру за два года (`patents.Activity.recent`); `None` — не
+    #: измерено. Подтверждение для слоя «слабый сигнал» (`weak.layers`).
+    patents_recent: int | None = None
+    #: Рост патентов «два года против двух до» (`patents.Activity.growth`); `None` — не мерили.
+    patents_growth: float | None = None
+    #: Слой выдачи (`weak.layers`: trend / weak / watch) и его причина; пусто — слои выключены.
+    layer: str = ""
+    layer_reason: str = ""
+    #: Категория направления и приём сверх неё (`weak.technique`); пусто — не оценивалось.
+    category: str = ""
+    technique: str = ""
+    #: Находки дополнительных источников (`weak.extra`): источник → число документов.
+    extra: dict[str, int] = field(default_factory=dict)
+    #: Направление запроса — индекс в `AskResult.facets` (`assign_facets`): сектор радара
+    #: веб-интерфейса. В отбор, порядок и уверенность не входит; `None` — не привязано.
+    facet: int | None = None
 
     @property
     def shown(self) -> bool:
@@ -388,6 +443,9 @@ class AskResult:
     excluded: list[Signal] = field(default_factory=list)
     #: Жанр зарождающийся, но за кандидатом один игрок или ни одного. Считается вслух.
     thin: list[Signal] = field(default_factory=list)
+    #: «Зарождающееся — наблюдать»: не тренд, но и не подтверждено двумя путями
+    #: (`weak.layers`). Пусто, когда слои выключены.
+    watch: list[Signal] = field(default_factory=list)
     context: list[Source] = field(default_factory=list)
     headlines_seen: int = 0
     #: Английские слова запроса: по ним считается тематичность направления. ⚠️ Русские
@@ -395,6 +453,8 @@ class AskResult:
     #: слов у них пустое всегда.
     area_en: str = ""
     facets_en: list[str] = field(default_factory=list)
+    #: Направления из всплеска в корпусе (`weak.burst`); пусто, когда флаг выключен.
+    bursts: list[str] = field(default_factory=list)
     #: Подрынки области, которыми расширен первый круг денежного потока (`expand`).
     #: ⚠️ В `query_words` они не входят намеренно: слово подрынка («insurance»,
     #: «components») в названии направления — не признак категории.
@@ -403,6 +463,12 @@ class AskResult:
     #: поодиночке. ⚠️ Считается вслух: это расхождение ДВУХ моделей на одном и том же
     #: тексте, и молча выбрасывать такое имя нельзя — надо знать, сколько их.
     players_unnamed: int = 0
+    #: Кандидаты, на которых оценка зрелости не удалась (таймаут, обрезанный или
+    #: невалидный ответ). ⚠️ Считаются вслух: иначе кандидат исчезает из выдачи без следа.
+    unassessed: list[str] = field(default_factory=list)
+    #: Разметка найденных работ приёмами (`tech.TechStats`): ждало разметки, упавших
+    #: пакетов, переставленных по эху элементов, модель недоступна.
+    tech_stats: dict[str, int | bool] = field(default_factory=dict)
     #: Признанные зарождающимися, но снятые проверкой тематичности (`weak.topic`).
     off_topic: int = 0
     #: Названия, снятые как рыночная категория: в них нет ни одного слова сверх
@@ -444,6 +510,64 @@ async def _one(system: str, user: str, schema: dict, name: str, max_tokens: int)
         )
 
 
+def _evidence(
+    shown: list[LiveDoc],
+    backing: list[LiveDoc],
+    works: list[tuple[str, str, str, str, int]],
+    core_fp: Footprint,
+    label_fp: Footprint,
+    today: date,
+) -> tuple[list[Evidence], list[Source], int]:
+    """Свидетельства и источники карточки в одном порядке + сколько первых видит оценщик.
+
+    `works` — (дата, текст, ссылка, источник, id) отобранных работ.
+
+    Номера источников в карточке совпадают с номерами свидетельств, поэтому порядок общий.
+    ⚠️ Не наступить: работы и след корпуса обязаны стоять ДО добранных заголовков
+    (`backing`). Промпт оценки показывает только первые `assess.EVIDENCE`, и добор,
+    поставленный раньше, вытеснял за потолок след и обе работы — у кандидатов с игроками
+    зрелость оценивалась по одним новостям (PEL-E-01).
+    """
+    ev: list[Evidence] = []
+    sources: list[Source] = []
+
+    def add_live(d: LiveDoc) -> None:
+        # ⚠️ Google News отдаёт и статьи журналов (Nature, IEEE): рыночным
+        # подтверждением они не являются, и модель должна видеть их как PAPER.
+        kind = PAPER if d.trust.kind in (SCIENCE, PREPRINT) else NEWS
+        ev.append(Evidence(-1, d.published, d.title, kind, d.url, d.publisher, d.snippet))
+        sources.append(_live_source(len(sources) + 1, d, kind))
+
+    for d in shown:
+        add_live(d)
+    for day, text, url, src, sid in works:
+        ev.append(Evidence(sid, day, text, PAPER, url, src))
+        sources.append(_paper_source(len(sources) + 1, day, text, url, src))
+    ev.append(Evidence(-1, today.isoformat(), corpus_line(core_fp, label_fp), CORPUS))
+    sources.append(_corpus_source(len(sources) + 1, core_fp, label_fp, today.isoformat()))
+    assessed = len(ev)
+    for d in backing:
+        add_live(d)
+    return ev, sources, assessed
+
+
+#: Потолок ответа оценки: класс, стадия, русское `why` и 9 суждений.
+ASSESS_TOKENS = 400
+
+
+def _assess(candidate: Candidate):
+    """Оценка зрелости одного кандидата; обрезанный потолком ответ — один повтор с вдвое
+    большим потолком. Русское `why` стоит 2–3 токена на слово и упирается в 400."""
+    prompt = assess_prompt(candidate)
+    try:
+        payload = asyncio.run(_one(ASSESS_PROMPT, prompt, assess_schema(), "assessment", ASSESS_TOKENS))
+    except LLMTruncated:
+        payload = asyncio.run(
+            _one(ASSESS_PROMPT, prompt, assess_schema(), "assessment", 2 * ASSESS_TOKENS)
+        )
+    return assess_parse(payload, candidate)
+
+
 @dataclass(slots=True)
 class Expansion:
     """Запрос, раскрытый моделью: фасеты, английский запрос, область, подрынки."""
@@ -457,6 +581,30 @@ class Expansion:
 
 def _phrases(got: dict, key: str) -> list[str]:
     return [" ".join(f.split()) for f in got.get(key, []) if str(f).strip()]
+
+
+#: Дата среза в промпте направлений (`flags.DATED_FACETS`, только под `weak.asof`). Подсказка
+#: даты утечку будущего не убирает (Sarkar & Vafa 2024, lookahead bias) — поэтому за ней
+#: стоит фильтр по корпусу на дату (`dated_facets`).
+DATED_EXPAND = (
+    "\n\nTODAY IS {cut}. The user is asking on {cut}: 'the last two or three years' means "
+    "the years before {cut}. Name only approaches that already had published papers before "
+    "{cut}; never name anything that appeared after {cut}."
+)
+#: ⚠️ Догадка, не замер: меньше 3 работ по набору слов на дату — направление названо из будущего.
+LEAK_MIN = 3
+
+
+def dated_facets(store: Store, facets_en: list[str], bursts: list[str], n: int = 6) -> list[str]:
+    """Направления на дату среза: без работ в корпусе на дату — вон, место добирает всплеск.
+
+    Направление, по которому на дату в корпусе меньше `LEAK_MIN` работ, аналитик в тот день
+    назвать не мог — это знание модели о будущем. Пробник на диффузии (+12, +18): работ о
+    цели среди найденного 0 и 5 → 11 и 14; всплеск без модели — 0.
+    """
+    fps = footprints(store, facets_en, loose=True)
+    kept = [f for f in facets_en if f in fps and fps[f].works >= LEAK_MIN]
+    return kept + [b for b in bursts if b not in kept][: max(n - len(kept), 0)]
 
 
 def expand(query: str) -> Expansion:
@@ -483,7 +631,10 @@ def expand(query: str) -> Expansion:
     monitoring», а «art brut и prison art» — в блокчейн и цифровых двойников, область
     же обобщалась до «contemporary art». Замер — на 10 запросах, глазами.
     """
-    got = asyncio.run(_one(EXPAND_PROMPT, query, _expand_schema(), "facets", 900))
+    system = EXPAND_PROMPT
+    if flags.DATED_FACETS and asof.active():
+        system += DATED_EXPAND.format(cut=asof.today().isoformat())
+    got = asyncio.run(_one(system, query, _expand_schema(), "facets", 900))
     facets = _phrases(got, "facets")
     query_en = " ".join(str(got.get("query_en") or "").split()) or query
     area = " ".join(str(got.get("area_en") or "").split()) or query_en
@@ -517,7 +668,9 @@ def _mentions(store: Store, ids: list[int]) -> dict[int, str]:
         f"AND signal_id IN ({listed})",
         [settings.llm_model],
     ).fetchall()
-    return {int(r[0]): r[1].strip().lower() for r in rows}
+    # Категория, записанная до нормализованной проверки (`tech._too_broad`), отсекается и
+    # при чтении: разметка навсегда, и иначе старые строки обходили бы правило.
+    return {int(r[0]): r[1].strip().lower() for r in rows if not too_broad(r[1])}
 
 
 # Доля свежих дат — одна реализация на выдачу и на замер датасета.
@@ -555,6 +708,33 @@ def _named_by(
             if name.lower() not in label_words:
                 out.setdefault(name, d)
     return out
+
+
+def _onpoint(label: str, area: str, named: dict[str, LiveDoc]) -> dict[str, LiveDoc]:
+    """Оставить компании, чей заголовок — про эту технологию (`weak.onpoint`).
+
+    ⚠️ Сбой проверки ничего не снимает: «не про технологию» без ответа модели не доказано.
+    """
+    titles = list(dict.fromkeys(d.title for d in named.values()))[: onpoint.MAX_HEADLINES]
+    try:
+        about = onpoint.parse(
+            asyncio.run(
+                _one(
+                    onpoint.SYSTEM_PROMPT,
+                    onpoint.build_prompt(label, area, titles),
+                    onpoint.schema(),
+                    "onpoint",
+                    120,
+                )
+            ),
+            len(titles),
+        )
+    except (LLMError, ValueError, httpx.HTTPError):
+        return named
+    kept = {titles[i - 1] for i in about}
+    # Заголовки сверх потолка проверки не судятся — и не снимаются.
+    unjudged = {d.title for d in named.values()} - set(titles)
+    return {x: d for x, d in named.items() if d.title in kept or d.title in unjudged}
 
 
 def _backing(shown: list[LiveDoc], rest: list[LiveDoc], named: dict[str, LiveDoc]) -> list[LiveDoc]:
@@ -719,9 +899,13 @@ def _merge_near(cands: list[_Cand], words: set[str]) -> list[_Cand]:
 
 
 def _merge_group(group: list[_Cand]) -> _Cand:
-    """Один кандидат из группы вариантов одного направления: всё вещество — в него."""
-    # Ярлыком остаётся тот, за кем больше вещества: игроки, потом заголовки.
-    group = sorted(group, key=lambda c: (-len(c.companies), -len(c.headlines), len(c.label)))
+    """Один кандидат из группы вариантов одного направления: всё вещество — в него.
+
+    Голова — ПЕРВЫЙ в группе: группы собираются в порядке `_merge_near`, то есть самое
+    специфичное название идёт первым. ⚠️ Не наступить: пересортировка по числу компаний
+    возвращала ровно ту эвристику, которую `_merge_near` отвергла замером, — общее имя,
+    под которое подходит больше игроков, растворяло в себе частное (PEL-C-04).
+    """
     head = group[0]
     return _Cand(
         label=head.label,
@@ -789,10 +973,12 @@ def _score_by_model(
     ⚠️ Расхождение с обучением одно и названо: датасет привязывался сырым русским
     названием, здесь ярлык английский (он и есть родной язык корпуса).
     """
+    # ⚠️ Модели роста здесь нет: её признаки (`query_share*`, `backed`, `players_cap`)
+    # считаются внутри запроса в `score`, а словарь ниже их не содержит — импутация медианой
+    # давала всем одну вероятность (PEL-F-02). Рост считает `score`, и только он.
     params = model_mod.load()
-    growth = model_mod.load(model_mod.GROWTH_PARAMS)
     listed = model_mod.load(model_mod.LISTED_PARAMS) if LISTED_IN_ASK else None
-    if (params is None and growth is None and listed is None) or not signals:
+    if (params is None and listed is None) or not signals:
         return
     # ⚠️ Победителю зоопарка могут быть нужны голоса LLM по плечам `papers` и `mixed`, а у
     # `ask` есть только одна оценка. Три оценки ради вероятности — +30 вызовов к демо
@@ -804,12 +990,12 @@ def _score_by_model(
     hits = ground(store, [s.label for s in signals], k=ARM_EVIDENCE)
     ev = evidence_for(store, sorted({h.signal_id for found in hits for h in found}))
     nbrs: list = [None] * len(signals)
-    wanted = [f for p in (params, growth, listed) if p is not None for f in p["features"]]
+    wanted = [f for p in (params, listed) if p is not None for f in p["features"]]
     if any(f in wanted for f in EMBED_FEATURES):
         say("соседство в векторах для пула (проход по шардам)...")
         nbrs, _cov, _ = neighbourhoods(store, [s.label for s in signals], today, say=say)
     year_before: dict[str, Footprint] = {}
-    if growth is not None or listed is not None:
+    if listed is not None:
         # Momentum ядра: работ за последний год к работам за год до того — второй след
         # под срезом «год назад» (кэш `weak.core` ключуется срезом). Ярлыки не считаются:
         # их след дорог (docs/todo.md §93), и `label_momentum` идёт медианой обучения.
@@ -827,7 +1013,11 @@ def _score_by_model(
     industry: dict[str, float | None] = {}
     if listed is not None and any(f in listed["features"] for f in rounds.MONEY_FEATURES):
         with_prev = any(f in listed["features"] for f in ("money_prev_n", "money_momentum"))
-        dollars = rounds.features([s.label for s in signals], today, say, with_prev=with_prev)
+        try:
+            dollars = rounds.features([s.label for s in signals], today, say, with_prev=with_prev)
+        except rounds.MoneyUnchecked as exc:
+            # Не измерено — признаки `$` пустые («измерить нечем»), а не нулевые.
+            say(f"денежный след не измерен: {exc}")
     if listed is not None and "industry_share" in listed["features"]:
         industry = industry_share(store, sorted({s.core for s in signals if s.core}))
     for sig, found, nbr, money_feats in zip(signals, hits, nbrs, dollars, strict=True):
@@ -853,17 +1043,12 @@ def _score_by_model(
             pred = model_mod.probability(feats, params)
             sig.probability = pred.probability
             sig.predictors = pred.predictors
-        if growth is not None or listed is not None:
+        if listed is not None:
             now_fp, before_fp = row.core_print, year_before.get(sig.core)
             momentum = None
             if before_fp is not None and (now_fp.last_year_works or before_fp.last_year_works):
                 momentum = (now_fp.last_year_works + 1) / (before_fp.last_year_works + 1)
             feats.update(emergence_features(sig, momentum, today))
-        if growth is not None:
-            g = model_mod.probability(feats, growth)
-            sig.growth = g.probability
-            sig.growth_predictors = g.predictors
-        if listed is not None:
             feats.update({**money_feats, "industry_share": industry.get(sig.core)})
             lp = model_mod.probability(feats, listed)
             sig.listed = lp.probability
@@ -895,7 +1080,10 @@ def emergence_features(
 
 
 def _on_topic(
-    ranked: list[tuple[Signal, list[Evidence]]], area: str, result: AskResult
+    ranked: list[tuple[Signal, list[Evidence]]],
+    area: str,
+    result: AskResult,
+    target: int | None = None,
 ) -> list[tuple[Signal, list[Evidence]]]:
     """Снять кандидатов, чьи свидетельства не о предмете запроса (`weak.topic`).
 
@@ -905,9 +1093,11 @@ def _on_topic(
     у потолка 1200 с (docs/todo.md §100). Непроверенный хвост уходит в «за пределами ТОП».
     ⚠️ Сбой проверки кандидата не снимает: без ответа модели «не по теме» не доказано.
     """
+    # `TOP` — в момент вызова, не при определении: со слоями цель шире (`LAYER_POOL`).
+    target = TOP if target is None else target
     kept: list[tuple[Signal, list[Evidence]]] = []
     for i, (sig, ev) in enumerate(ranked):
-        if len(kept) >= TOP:
+        if len(kept) >= target:
             return kept + ranked[i:]
         try:
             grade, why = topic.parse(
@@ -937,21 +1127,195 @@ def _on_topic(
     return kept
 
 
-def attach_patents(
+#: Сколько тематичных кандидатов набирать под слои: часть уйдёт в «наблюдать», и ТОП-15
+#: должен набраться из остальных. ⚠️ Догадка; цена — патенты на весь пул (~3.5 мин на 15).
+#: Весь пул кандидатов: при 30 после проверки тематичности у «космоса» оставалось 19, и
+#: ТОП-15 не набирался.
+LAYER_POOL = CANDIDATES
+#: Сколько «зарождающихся» показывать блоком «наблюдать». ⚠️ Догадка.
+WATCH_MAX = 10
+
+
+def _drop_trends(
+    shown: list[tuple[Signal, list[Evidence]]], result: AskResult
+) -> list[tuple[Signal, list[Evidence]]]:
+    """«Уже тренд» — в исключённые с причиной, до тематичности и патентов: для этого слоя
+    хватает прочитанного (крупные игроки с продажами, лидеры рынка) — `weak.layers`."""
+    kept = []
+    for sig, ev in shown:
+        lay = layers_mod.classify(sig.companies, sig.judgments, sig.label_works or 0, None)
+        if lay.name != layers_mod.TREND:
+            kept.append((sig, ev))
+            continue
+        sig.layer, sig.layer_reason = lay.name, lay.reason
+        sig.kind, sig.kind_label = MATURE, "уже тренд"
+        sig.why = f"Уже тренд: {lay.reason}."
+        result.excluded.append(sig)
+    return kept
+
+
+def _techniques(
+    shown: list[tuple[Signal, list[Evidence]]], result: AskResult
+) -> list[tuple[Signal, list[Evidence]]]:
+    """Приём за направлением (`weak.technique`); не назван в свидетельствах — «слишком
+    общая категория» с причиной. ⚠️ Сбой вызова кандидата не снимает."""
+    kept = []
+    for sig, ev in shown:
+        try:
+            category, found = technique_mod.parse(
+                asyncio.run(
+                    _one(
+                        technique_mod.SYSTEM_PROMPT,
+                        technique_mod.build_prompt(sig.label, ev),
+                        technique_mod.schema(),
+                        "technique",
+                        160,
+                    )
+                ),
+                ev,
+            )
+        except (LLMError, ValueError, httpx.HTTPError):
+            kept.append((sig, ev))
+            continue
+        sig.category, sig.technique = category, found
+        if found:
+            kept.append((sig, ev))
+            continue
+        sig.kind, sig.kind_label = TOO_BROAD, kind_label(TOO_BROAD)
+        sig.why = (
+            f"Слишком общая категория: «{category or sig.label}» — в свидетельствах не назван "
+            "приём, которого нет у обычных работ этой категории."
+        )
+        result.excluded.append(sig)
+    return kept
+
+
+def excluded_why(kind: str, judgments: dict[str, float]) -> str:
+    """Причина исключения, когда объяснение модели снято (нет ссылки `[n]` — `assess.parse`).
+
+    BR-03: каждый исключённый — с причиной. Слова модели без ссылки показывать нельзя, а
+    признаки оценки (`assess.JUDGMENTS`) — её же ответ по тем же свидетельствам, только
+    атомарный; их и называем. У ТОП (`EMERGING`) пустое объяснение остаётся пустым — там оно
+    проверка уверенности «объяснение со ссылками», а не подпись.
+    """
+    if kind == EMERGING:
+        return ""
+    seen = [
+        FEATURE_LABELS[k] + (f": {v:.0f}" if k == "players_named" else "")
+        for k, v in judgments.items()
+        if v and k in FEATURE_LABELS and k != "novelty_claimed"
+    ]
+    tail = "Объяснение оценщика без ссылки на свидетельство не показано."
+    return f"По признакам оценки: {'; '.join(seen)}. {tail}" if seen else tail
+
+
+def _split_layers(
+    shown: list[tuple[Signal, list[Evidence]]],
+    result: AskResult,
+    say: Callable[[str], None],
+    deadline: float | None = None,
+) -> list[tuple[Signal, list[Evidence]]]:
+    """Слабый сигнал — в ТОП, зарождающееся — в «наблюдать» (`weak.layers`).
+
+    Патенты нужны слою как подтверждение, поэтому считаются на весь пул `LAYER_POOL`, а не
+    на 15 показанных. Порядок внутри слоя — прежний (скоринг). `deadline` — тот же срок,
+    что у патентов обычного пути (BR-33): кандидат, до которого не дошли, слоится без них.
+    """
+    pool, rest = shown[:LAYER_POOL], shown[LAYER_POOL:]
+    attach_patents(pool, result.live_errors, say, deadline=deadline)
+    if flags.EXTRA_SOURCES:
+        attach_extra(pool, result.live_errors, say)
+    weak, watch = [], []
+    # Рост патентов сравнивается с медианой пула: растёт весь патентный поток, и «рост
+    # вообще» подтверждал бы почти всех (на запросах ТЗ медиана пула — ×1.3…×2.0).
+    growths = [s.patents_growth for s, _ in pool if s.patents_growth is not None]
+    floor = _median_float(growths) if growths else 1.0
+    for sig, ev in pool:
+        lay = layers_mod.classify(
+            sig.companies, sig.judgments, sig.label_works or 0, sig.patents_growth, sig.extra,
+            growth_floor=floor,
+        )
+        sig.layer, sig.layer_reason = lay.name, lay.reason
+        (weak if lay.name == layers_mod.WEAK else watch).append((sig, ev))
+    # Добор до 15: ТЗ требует пятнадцать позиций, а слабых бывает меньше (у «космоса» 14).
+    # Недостающие места — лучшим из «наблюдать», со слоем и причиной на карточке: позиция
+    # есть, но за слабый сигнал она себя не выдаёт (docs/todo.md §117).
+    need = max(TOP - len(weak), 0)
+    for sig, _ in watch[:need]:
+        sig.layer_reason = "добор до пятнадцати позиций: " + sig.layer_reason
+    fill, watch = watch[:need], watch[need:]
+    result.watch = [s for s, _ in watch[:WATCH_MAX]]
+    # Сверх «наблюдать» — в «за пределами ТОП», а не в никуда: отсев считается вслух.
+    return weak + fill + watch[WATCH_MAX:] + rest
+
+
+#: Тип свидетельства для документов `weak.extra` в карточке.
+EXTRA_EV = {
+    extra_mod.NIH: "GRANT",
+    extra_mod.PREPRINT: PAPER,
+    extra_mod.TRIALS: "TRIAL",
+    extra_mod.YC: NEWS,
+}
+
+
+def attach_extra(
     shown: list[tuple[Signal, list[Evidence]]],
     live_errors: dict[str, str],
     say: Callable[[str], None] = lambda _m: None,
 ) -> None:
-    """Патентная строка и свежие патенты — в карточку и в свидетельства, в ногу."""
+    """Гранты, препринты, клинические испытания и стартапы YC — в карточку и в счёт
+    подтверждений слоя (`weak.extra`). Как патенты: ПОСЛЕ оценки зрелости, в балл не идёт.
+
+    ⚠️ Свидетельство и источник — в ногу: номера в карточке общие.
+    """
+    if not shown:
+        return
+    say(f"гранты, препринты, испытания, стартапы: {len(shown)}")
+    got = extra_mod.gather([(s.core or s.label).strip() for s, _ in shown])
+    silent: dict[str, int] = {}
+    for (sig, ev), found in zip(shown, got, strict=True):
+        sig.extra = {src: len(found.found(src)) for src in extra_mod.SOURCES}
+        for src in found.unmeasured():
+            silent[src] = silent.get(src, 0) + 1
+        for src in extra_mod.SOURCES:
+            for d in found.found(src):
+                kind = EXTRA_EV[src]
+                ev.append(Evidence(-1, d.published, d.title, kind, d.url, d.publisher, d.snippet))
+                sig.sources.append(_live_source(len(sig.sources) + 1, d, kind))
+    # ⚠️ Отказ виден, как у патентов: без строки «не ответил» ноль грантов неотличим от сбоя.
+    for src, n in silent.items():
+        live_errors[src] = f"не ответил по {n} из {len(shown)} кандидатов"
+
+
+def attach_patents(
+    shown: list[tuple[Signal, list[Evidence]]],
+    live_errors: dict[str, str],
+    say: Callable[[str], None] = lambda _m: None,
+    deadline: float | None = None,
+) -> None:
+    """Патентная строка и свежие патенты — в карточку и в свидетельства, в ногу.
+
+    `deadline` — `time.monotonic()`, после которого новых запросов к OPS нет; кандидаты,
+    до которых не дошли, остаются без патентной строки, а причина — в `live_errors`.
+    """
     if not (patents_mod.enabled() and shown):
         return
     say(f"патентная активность: {len(shown)}")
-    acts = patents_mod.activity(sorted({(s.core or s.label).strip() for s, _ in shown}))
+    phrases = sorted({(s.core or s.label).strip() for s, _ in shown})
+    try:
+        acts = patents_mod.activity(phrases, deadline=deadline)
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        # Последняя страховка: патенты идут на 12–16-й минуте, и строка карточки не стоит
+        # потерянного прогона. Обычные отказы `patents` закрывает сам (`closed()`).
+        live_errors["patents"] = f"не ответил: {type(exc).__name__}"
+        return
     for sig, ev in shown:
         act = acts.get((sig.core or sig.label).strip())
         if act is None:
             continue
         sig.patents = act.line()
+        sig.patents_recent = act.recent if act.measured else None
+        sig.patents_growth = act.growth
         for d in act.docs:
             # Свидетельство и источник — в ногу: номера в карточке общие, и сдвиг
             # здесь разъехался бы по всем ссылкам.
@@ -972,7 +1336,7 @@ def score(pool: list[Signal], say: Callable[[str], None] = lambda _m: None) -> b
     научного следа ядра сверх области за два года (`scripts/train_growth_model.py
     --in-query`); признаки — `model.QUERY_FEATURES`, посчитанные внутри ЭТОГО запроса той же
     функцией, что при обучении. Проверка будущим (обучение на двух срезах, проверка на
-    третьем): AUC 0.85 / 0.82 / 0.73 при случайном 0.58–0.62 (docs/weak-audit.md).
+    третьем): AUC 0.83 / 0.90 / 0.83 (± 0.06–0.09) при случайном 0.60–0.61 (docs/weak-audit.md).
     Пишет `confidence` (вероятность, калибровка Платта) и `predictors` (вклады со знаком).
     Все четыре признака уже посчитаны к этому месту: прохода по корпусу скоринг не стоит.
 
@@ -995,7 +1359,7 @@ def score(pool: list[Signal], say: Callable[[str], None] = lambda _m: None) -> b
             for s in pool
         ]
     )
-    for s, f in zip(pool, feats):
+    for s, f in zip(pool, feats, strict=True):
         pred = model_mod.probability(f, params)
         s.confidence = pred.probability
         s.predictors = pred.predictors
@@ -1096,8 +1460,9 @@ def answer_models() -> list[dict[str, str]]:
 
 
 #: Ответ модели на карточку: четыре раздела, гипотеза, хронология и резюме источников.
-#: ⚠️ Догадка с запасом (docs/todo.md §99): обрезка ответа не мерилась; +200 под гипотезу.
-CARD_TOKENS = 1800
+#: ⚠️ Догадка с запасом (docs/todo.md §99): обрезка ответа не мерилась; +200 под гипотезу,
+#: +300 под «почему слабый сигнал» с цитатой.
+CARD_TOKENS = 2100
 
 
 def deepen_top(
@@ -1141,7 +1506,7 @@ def write_cards(
                     CARD_TOKENS,
                 )
             )
-            c = card_mod.parse(payload, sig.title, ev, sig.companies)
+            c = card_mod.parse(payload, sig.title, ev)
         except (LLMError, ValueError, httpx.HTTPError):
             continue
         sig.title, sig.description, sig.advantage, sig.case = (
@@ -1152,6 +1517,11 @@ def write_cards(
         )
         sig.facts = [{"date": d, "text": t} for d, t in c.facts]
         sig.hypothesis = c.hypothesis
+        # Объяснение карточки — «почему слабый сигнал», по полным текстам свидетельств; у
+        # оценки зрелости оно про жанр и стадию и пустеет без ссылки. Пусто у карточки —
+        # остаётся объяснение оценки.
+        if c.why:
+            sig.why, sig.why_quote = c.why, c.why_quote
         for s in sig.sources:
             s.summary_ru = c.summaries.get(s.n, "")
             s.machine_summary = bool(s.summary_ru)
@@ -1175,40 +1545,191 @@ def _ru_titles_schema(n: int) -> dict:
     }
 
 
+#: Номер пункта, который модель повторяет из позиционного промпта («14. Ridge Security…»).
+_ECHOED_NUMBER = re.compile(r"^\d+[.)]\s+")
+
+
+def _positional_text(raw: object) -> str:
+    """Строка позиционного ответа: пробелы схлопнуты, повторённый номер пункта срезан."""
+    return _ECHOED_NUMBER.sub("", " ".join(str(raw).split()))
+
+
 def russian_titles(sigs: list[Signal], say: Callable[[str], None] = lambda _m: None) -> None:
     """Русские названия исключённых и не вошедших в ТОП (ТЗ: вся выдача на русском).
 
     Карточку им не пишут — это дорого, а название нужно, чтобы список исключений читался.
-    Раскладка позиционная (как `weak.translate`). Сбой вызова или чужое письмо в ответе —
+    Сюда же идут карточки ТОП, чей заголовок остался латиницей. Раскладка позиционная (как
+    `weak.translate`). Ответ без кириллицы («перевод», повторивший английский) или с чужим
+    письмом не берётся; непереведённые спрашиваются ещё раз одним вызовом, после него
     остаётся английский ярлык: он хотя бы верен.
     """
-    if not sigs:
+    pending = list(sigs)
+    if not pending:
         return
-    say(f"перевожу названия исключённых: {len(sigs)}")
-    for start in range(0, len(sigs), RU_TITLES_BATCH):
-        part = sigs[start : start + RU_TITLES_BATCH]
-        user = "\n".join(f"{i}. {s.label}" for i, s in enumerate(part, 1))
+    say(f"перевожу названия исключённых: {len(pending)}")
+    for _attempt in range(2):
+        failed: list[Signal] = []
+        for start in range(0, len(pending), RU_TITLES_BATCH):
+            part = pending[start : start + RU_TITLES_BATCH]
+            user = "\n".join(f"{i}. {s.label}" for i, s in enumerate(part, 1))
+            try:
+                got = asyncio.run(
+                    _one(RU_TITLES_PROMPT, user, _ru_titles_schema(len(part)), "ru_titles", 60 * len(part))
+                )
+            except (LLMError, ValueError, httpx.HTTPError):
+                failed += part
+                continue
+            items = got.get("items") or []
+            for i, sig in enumerate(part):
+                ru = _positional_text(items[i]) if i < len(items) else ""
+                if ru and card_mod.has_cyrillic(ru) and not card_mod.foreign_script(ru):
+                    sig.title = ru
+                else:
+                    failed.append(sig)
+        if not failed:
+            return
+        pending = failed
+
+
+RU_SUMMARY_PROMPT = """For each numbered source write ONE Russian sentence (10 to 30 words)
+saying what the source reports, using ONLY its title and excerpt. Keep names, numbers and
+established English terms as they are. No explanation, no quotes.
+Answer for every item, in the given order."""
+
+#: Источников за один вызов. ⚠️ Догадка, не замер (docs/todo.md §120): ответ — ~40 токенов
+#: на источник, 20 укладываются в потолок одного вызова с запасом.
+RU_SUMMARY_BATCH = 20
+#: Сколько символов выдержки видит модель на источник: на одну фразу хватает начала.
+RU_SUMMARY_CHARS = 400
+
+
+def russian_summaries(
+    sigs: list[Signal], errors: dict[str, str], say: Callable[[str], None], deadline: float
+) -> None:
+    """Русское резюме каждому зарубежному источнику, у которого его не написала карточка.
+
+    ТЗ: «для зарубежных материалов сервис должен предоставлять русскоязычное резюме…
+    при использовании генеративного резюме необходимо отметить это возле источника».
+    Карточка пишет резюме только процитированным источникам (`card.SYSTEM_PROMPT`), а
+    таблица источников показывает все — остальным оно добирается здесь, пакетом, с той же
+    пометкой `machine_summary`. Раскладка позиционная (как `russian_titles`); сбой вызова или
+    чужое письмо — резюме нет, и страница так и пишет. Дедлайн запроса — граница: не
+    успели — пометка в `errors`, а не превышение потолка заказчика.
+    """
+    todo = [s for sig in sigs for s in sig.sources if s.lang != "ru" and not s.summary_ru]
+    if not todo:
+        return
+    say(f"русские резюме зарубежных источников: {len(todo)}")
+    for start in range(0, len(todo), RU_SUMMARY_BATCH):
+        if time.monotonic() >= deadline:
+            errors["summaries"] = (
+                f"русское резюме не дописано у {len(todo) - start} зарубежных источников: "
+                "исчерпан бюджет времени запроса"
+            )
+            return
+        part = todo[start : start + RU_SUMMARY_BATCH]
+        user = "\n".join(
+            f"{i}. {s.title}" + (f" — {s.excerpt[:RU_SUMMARY_CHARS]}" if s.excerpt else "")
+            for i, s in enumerate(part, 1)
+        )
         try:
             got = asyncio.run(
-                _one(RU_TITLES_PROMPT, user, _ru_titles_schema(len(part)), "ru_titles", 60 * len(part))
+                _one(RU_SUMMARY_PROMPT, user, _ru_titles_schema(len(part)), "ru_summaries", 80 * len(part))
             )
         except (LLMError, ValueError, httpx.HTTPError):
             continue
-        for sig, ru in zip(part, got.get("items") or [], strict=False):
-            ru = " ".join(str(ru).split())
+        for src, ru in zip(part, got.get("items") or [], strict=False):
+            ru = _positional_text(ru)
             if ru and not card_mod.foreign_script(ru):
-                sig.title = ru
+                src.summary_ru, src.machine_summary = ru, True
 
 
-def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult:
+def assign_facets(
+    cands: list[_Cand], facets: list[str], hits: list[list], by_tech: dict[str, list[int]]
+) -> dict[str, int]:
+    """Ярлык кандидата → направление запроса (индекс в `facets`): сектор радара.
+
+    Научному кандидату — фасет, чья привязка (`ground`) дала больше всего работ его
+    вариантам: так он и был найден. Денежному и научному без таких работ — ближайший фасет
+    по косинусу векторов того же эмбеддера (`vectors_for`; ярлык английский, фасет русский —
+    эмбеддер многоязычный). Порога нет, это argmax: сектор у радара есть всегда.
+    ⚠️ Качество привязки не замерено (docs/todo.md §119). На отбор, порядок и уверенность
+    направление не влияет. Сбой эмбеддера — кандидат без направления, а не угаданный сектор.
+    """
+    by_facet = [{h.signal_id for h in found} for found in hits]
+    out: dict[str, int] = {}
+    rest: list[_Cand] = []
+    for c in cands:
+        works = {sid for t in c.members for sid in by_tech.get(t, [])}
+        counts = [len(works & f) for f in by_facet]
+        if counts and max(counts) > 0:
+            out[c.label] = counts.index(max(counts))
+        else:
+            rest.append(c)
+    if not rest or not facets:
+        return out
+    try:
+        vectors = vectors_for(list(facets) + [c.label for c in rest])
+    except (httpx.HTTPError, ValueError, KeyError):
+        return out
+    near = (vectors[len(facets) :] @ vectors[: len(facets)].T).argmax(axis=1)
+    out.update({c.label: int(k) for c, k in zip(rest, near, strict=True)})
+    return out
+
+
+def _event_signal(s: Signal) -> dict[str, Any]:
+    """Вердикт по кандидату для экрана ожидания: то, что видно точкой и строкой ленты."""
+    return {
+        "label": s.label,
+        "title": s.title,
+        "kind": s.kind,
+        "kind_label": s.kind_label,
+        "stage": s.stage,
+        "why": s.why,
+        "companies": s.companies[:4],
+        "stream": s.stream,
+        "facet": s.facet,
+        "sources": len(s.sources),
+    }
+
+
+def run(
+    store: Store, query: str, on_progress: ProgressHook = None, on_event: EventHook = None
+) -> AskResult:
     say = on_progress or (lambda _msg: None)
+    emit = events.checked(on_event) if on_event else (lambda _kind, _data: None)
+
+    def stage(sid: str) -> None:
+        emit("stage", events.stage(sid))
+
     t0 = datetime.now(UTC)
+    # Бюджет времени — от старта прогона: ни одна стадия сама не знает, сколько уже прошло.
+    deadline = time.monotonic() + BUDGET_S
     # Под срезом «сегодня» — это дата среза: иначе свежесть считалась бы от нашего дня.
     today = asof.today()
 
+    stage("expand")
     say("раскрываю запрос в направления")
     ex = expand(query)
     facets, query_en, area_en, facets_en = ex.facets, ex.query_en, ex.area_en, ex.facets_en
+    bursts: list[str] = []
+    if flags.DATED_FACETS and asof.active():
+        # Поиск — английскими фразами: русские пары отсеянных направлений не выровнять со
+        # всплеском, а пробник мерил именно английские (`dated_facets`).
+        say("сверяю направления с корпусом на дату среза")
+        facets_en = dated_facets(
+            store, facets_en, [b.phrase for b in burst_mod.facets(store, [query_en, area_en], today)]
+        )
+        facets = facets_en or facets
+    if flags.BURST:
+        # Направления модели называют уже известное ей; всплеск в корпусе — то, чего она не
+        # видела (`weak.burst`, docs/todo.md §112). Область — словами запроса, не фасетами.
+        say("ищу всплески в корпусе")
+        bursts = [b.phrase for b in burst_mod.facets(store, [query_en, area_en], today)]
+        if flags.BURST == "only" and bursts:
+            facets, facets_en = bursts, bursts
+        else:
+            facets = facets + bursts
     result = AskResult(
         query,
         query_en,
@@ -1220,15 +1741,35 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         version=REPORT_VERSION,
     )
 
+    result.bursts = bursts
+    emit(
+        "facets",
+        {
+            "facets_ru": list(facets),
+            "facets_en": list(facets_en),
+            "submarkets": list(ex.submarkets_en),
+            "query_en": query_en,
+        },
+    )
+    stage("science")
     say(f"ищу по локальному корпусу: {len(facets)} направлений")
     hits = ground(store, facets, k=PER_FACET)
     ids = sorted({h.signal_id for found in hits for h in found})
     result.works_found = len(ids)
 
     say(f"называю технологию в {len(ids)} работах")
-    run_tech(store, ids=ids)
+    _named, tech_stats = run_tech(store, ids=ids)
+    # ⚠️ Отказы разметки и сдвиги раскладки — в отчёт: работа без приёма из-за упавшего
+    # пакета иначе неотличима от работы, где приёма нет.
+    result.tech_stats = {
+        "pending": tech_stats.pending,
+        "failed_batches": tech_stats.failed_batches,
+        "echo_swap": tech_stats.echo_swap,
+        "unreachable": tech_stats.unreachable,
+    }
     mention = _mentions(store, ids)
     result.works_named = len(mention)
+    emit("counts", {"works": result.works_found, "works_named": result.works_named})
     papers = _papers(store, ids)
 
     # сведение вариантов написания — только внутри этого запроса
@@ -1255,8 +1796,9 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         ]
 
     words = query_words(query_en, area_en, *facets_en)
+    stage("money")
     say("денежный поток: направления, за которыми стоят несколько компаний")
-    money, seen_headlines = money_candidates(
+    money, seen_headlines, money_cover = money_candidates(
         money_queries(area_en, facets_en, ex.submarkets_en), say, area=area_en
     )
     money = [m for m in money if m.label not in by_tech]
@@ -1273,6 +1815,7 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         )
     )
     say(f"денежный поток: {len(money)} направлений из {seen_headlines} заголовков")
+    emit("counts", {"headlines": seen_headlines, "directions": len(money)})
     money = money[:MONEY_POOL]
     if money:
         # Работы корпуса к названию из заголовка — той же привязкой, что у фасетов.
@@ -1294,9 +1837,12 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         for m in money
     ]
     if not cands:
+        if note := money_cover.note():
+            result.live_errors["google_news_money"] = note
         result.seconds = (datetime.now(UTC) - t0).total_seconds()
         return result
 
+    stage("merge")
     say(f"свожу {len(cands)} кандидатов к ядру технологии")
     for c, core in zip(cands, cores([c.label for c in cands]), strict=True):
         c.core = core
@@ -1314,6 +1860,7 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         say(f"снято как рыночная категория: {len(result.categories)}")
     # ⚠️ Стадия идёт минуты (условие по 5.5 млн работ стоит секунды) и молчащая
     # читается как зависание.
+    stage("evidence")
     say(f"меряю след ядер в корпусе: {len(cands)} условий, это минуты")
     # ⚠️ Ядро ищется точной фразой, ярлык — по набору слов (`weak.core._match`), и
     # СЧИТАЮТСЯ ОНИ ПОРОЗНЬ: след ядра нужен всем кандидатам (по нему идёт отбор в
@@ -1330,16 +1877,28 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     # ⚠️ Отбор в оценку — по НОВИЗНЕ ядра, а не по частоте ярлыка: частый ярлык это
     # ровно зрелое ML в прикладных статьях (первый прогон вывел в ТОП LSTM и GNN).
     # Денежный поток идёт первым: разметка заказчика — по деньгам.
+    # ⚠️ Ядро без единой работы — «измерить нечем», а не «новее всех»: с подстановкой 9999
+    # такие кандидаты гарантированно проходили отсев до 45 и вытесняли настоящие научные
+    # с реальным, пусть и старым, ядром (PEL-E-03). Неизвестный год — в хвост.
     cands.sort(
         key=lambda c: (
             c.stream != MONEY_STREAM,
-            -(trace(c.core).first_year or 9999),
+            -(trace(c.core).first_year or 0),
             trace(c.core).works,
         )
     )
     cands = cands[:CANDIDATES]
     result.candidates = len(cands)
     result.headlines_seen = seen_headlines
+    emit(
+        "counts",
+        {
+            "candidates": len(cands),
+            "categories_removed": len(result.categories),
+            "categories": list(result.categories),
+        },
+    )
+    facet_of = assign_facets(cands, facets, hits, by_tech)
     say(f"меряю след названий в корпусе: {len(cands)} условий")
     label_prints = footprints(store, [c.label for c in cands], loose=True)
 
@@ -1349,10 +1908,23 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     say(f"живой поиск: новости и русскоязычные источники по {len(cands)} кандидатам")
     # Ярлык группы — уже английское название приёма (модель называет его по
     # английской аннотации), поэтому новостной запрос — сам ярлык, без перевода.
-    news_en = news_many([c.label for c in cands], "en")
+    news_en = news_many_measured([c.label for c in cands], "en")
     live = live_search(query, area_en)
     result.live_by_source = dict(live.queried)
     result.live_errors = dict(live.errors)
+    if note := money_cover.note():
+        result.live_errors["google_news_money"] = note
+    if failed := result.tech_stats.get("failed_batches"):
+        result.live_errors["tech"] = (
+            f"разметка приёмами не удалась в {failed} пакетах: их работы без приёма"
+        )
+    unmeasured = {c.label for c, docs in zip(cands, news_en, strict=True) if docs is None}
+    if unmeasured:
+        # ⚠️ Отказ обязан быть виден: кандидат без новостей из-за сбоя неотличим от
+        # кандидата, о котором новостей нет, — а это разные выводы о зрелости.
+        result.live_errors["google_news_candidates"] = (
+            f"не ответил по {len(unmeasured)} из {len(cands)} кандидатов и после повтора"
+        )
     result.context = [
         _live_source(i + 1, d, CODE if d.source == "github" else NEWS)
         for i, d in enumerate(live.docs)
@@ -1363,7 +1935,9 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     attached: list[list[LiveDoc]] = []
     for c, fresh in zip(cands, news_en, strict=True):
         taken = {d.title for d in c.headlines}
-        attached.append((c.headlines + [d for d in fresh if d.title not in taken])[:NEWS_PER_CARD])
+        attached.append(
+            (c.headlines + [d for d in fresh or [] if d.title not in taken])[:NEWS_PER_CARD]
+        )
     # ⚠️ Игрок — компания из РЫНОЧНОЙ новости. У научной заметки «компаниями»
     # оказываются журнал, университет и конференция («Scientific Reports», «College of
     # Engineering», «AAAI-26»), и научный кандидат проходил бы порог игроков даром.
@@ -1382,6 +1956,7 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     say(f"нахожу компании в {len(flat)} заголовках")
     firms = dict(zip([d.title for d in flat], companies_of(flat), strict=True))
 
+    stage("assess")
     say(f"оцениваю зрелость {len(cands)} кандидатов")
     built: list[tuple[Signal, list[Evidence]]] = []
     news_by_label: dict[str, list[LiveDoc]] = {}
@@ -1390,41 +1965,31 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
         work_ids = [sid for t in c.members for sid in by_tech.get(t, []) if sid in papers]
         # ⚠️ Научная опора — это работа, В ТЕКСТЕ которой стоит ядро технологии, а не
         # любая найденная привязкой: поиск возвращает k работ всегда, и проверка на
-        # «нашлись ли работы» проходила бы по построению. Сравнение подстрокой
+        # «нашлись ли работы» проходила бы по построению. Сравнение по тексту
         # одинаково честно для обоих потоков, в отличие от совпадения ярлыков:
         # ярлык денежного кандидата приходит из заголовка и с формулировкой статьи
         # не совпадёт никогда.
         needle = (c.core or c.label).strip().lower()
-        named_works = [sid for sid in work_ids if needle and needle in papers[sid][1].lower()]
+        named_works = [sid for sid in work_ids if names_core(papers[sid][1], needle)]
         processed += len(docs[:NEWS_PER_CARD])
         # ⚠️ Слово из самого ярлыка компанией не считается: у «ensemble of specialized
         # large language models» игроком оказался «Ensemble».
         label_words = {w for w in re.findall(r"[a-z0-9]+", c.label.lower())}
         named = _named_by(docs, firms, label_words)
+        if flags.ONPOINT_COMPANIES and named:
+            named = _onpoint(c.label, area_en, named)
         shown = docs[:NEWS_PER_CARD]
         news_by_label[c.label] = list(shown)
         # Компания без показанного источника читателем не проверяется, а ТЗ требует
         # источники. Добираем заголовки, которые накрывают больше всего таких компаний.
-        shown += _backing(shown, docs[NEWS_PER_CARD:], named)
-        processed += len(shown) - len(docs[:NEWS_PER_CARD])
-
-        ev: list[Evidence] = []
-        sources: list[Source] = []
-        for d in shown:
-            # ⚠️ Google News отдаёт и статьи журналов (Nature, IEEE): рыночным
-            # подтверждением они не являются, и модель должна видеть их как PAPER.
-            kind = PAPER if d.trust.kind in (SCIENCE, PREPRINT) else NEWS
-            ev.append(Evidence(-1, d.published, d.title, kind, d.url, d.publisher, d.snippet))
-            sources.append(_live_source(len(sources) + 1, d, kind))
-        for sid in work_ids[:PAPERS_PER_CARD]:
-            day, text, url, src = papers[sid]
-            ev.append(Evidence(sid, day, text, PAPER, url, src))
-            sources.append(_paper_source(len(sources) + 1, day, text, url, src))
-        # След корпуса — ПОСЛЕДНИМ: номера источников в карточке совпадают с номерами
-        # свидетельств, и сдвиг здесь разъехался бы по всей карточке.
+        backing = _backing(shown, docs[NEWS_PER_CARD:], named)
+        processed += len(backing)
         core_fp, label_fp = trace(c.core), label_trace(c.label)
-        ev.append(Evidence(-1, today.isoformat(), corpus_line(core_fp, label_fp), CORPUS))
-        sources.append(_corpus_source(len(sources) + 1, core_fp, label_fp, today.isoformat()))
+        ev, sources, assessed = _evidence(
+            shown, backing, [papers[sid] + (sid,) for sid in work_ids[:PAPERS_PER_CARD]],
+            core_fp, label_fp, today,
+        )  # fmt: skip
+        shown = shown + backing
         market = sum(1 for e in ev if e.kind == NEWS)
         # В карточку идут только те игроки, чей заголовок в ней ПОКАЗАН.
         titles = {d.title for d in shown}
@@ -1435,18 +2000,21 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
             1 for x in c.companies if x not in named and x.lower() not in label_words
         )
 
+        # Оценщик видит ровно замеренный состав: новости, работы, след. Добор — только
+        # карточке и таблице источников.
+        assert assessed <= ASSESS_EVIDENCE, f"{assessed} свидетельств при потолке {ASSESS_EVIDENCE}"
+        candidate = Candidate(c.label, c.label, ev[:assessed], area_en)
         try:
-            payload = asyncio.run(
-                _one(
-                    ASSESS_PROMPT,
-                    assess_prompt(Candidate(c.label, c.label, ev, area_en)),
-                    assess_schema(),
-                    "assessment",
-                    400,
-                )
-            )
-            a = assess_parse(payload, Candidate(c.label, c.label, ev, area_en))
-        except (LLMError, ValueError, httpx.HTTPError):
+            a = _assess(candidate)
+        except (LLMError, ValueError, httpx.HTTPError) as exc:
+            # ⚠️ Отказ оценки обязан быть виден: кандидат иначе исчезал из выдачи без следа
+            # — ни в сигналах, ни в исключённых, ни в отказах источников (PEL-E-02).
+            result.unassessed.append(c.label)
+            say(f"оценка не удалась: {c.label} ({type(exc).__name__})")
+            emit("verdict", {"label": c.label, "title": c.label, "kind": "error",
+                             "kind_label": "оценка не удалась", "stage": "", "why": "",
+                             "companies": [], "stream": c.stream,
+                             "facet": facet_of.get(c.label), "sources": 0})
             continue
 
         recent = _age_share([e.date for e in ev if e.kind != CORPUS], today)
@@ -1466,7 +2034,7 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
                 "несколько независимых игроков",
                 len(companies) >= MIN_PLAYERS,
                 "компании: " + (", ".join(companies[:4]) or "не названы"),
-                entry=True,
+                scored=False,
             ),
             Check(
                 "разные типы источников",
@@ -1485,8 +2053,8 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
             ),
             Check("объяснение со ссылками", bool(a.why), f"ссылок: {len(a.cited)}"),
         ]
-        # ⚠️ Уверенность — доля пройденных проверок СВЕРХ условий отбора.
-        scored = [x for x in checks if not x.entry]
+        # ⚠️ Уверенность — доля пройденных проверок СВЕРХ условий отбора и подписей.
+        scored = [x for x in checks if x.counted]
         conf = sum(x.passed for x in scored) / len(scored)
         sig = Signal(
             label=c.label,
@@ -1497,7 +2065,7 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
             confidence=conf,
             evidence_share=conf,
             checks=checks,
-            why=card_mod.drop_foreign(a.why),
+            why=card_mod.drop_foreign(a.why) or excluded_why(a.kind, a.judgments),
             sources=sources,
             variants=c.members[:8],
             papers=len(named_works),
@@ -1511,9 +2079,17 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
             companies=companies,
             stream=c.stream,
             judgments=a.judgments,
+            news_unmeasured=c.label in unmeasured,
+            facet=facet_of.get(c.label),
         )
         built.append((sig, ev))
+        emit("verdict", _event_signal(sig))
     result.sources_processed = processed
+    if result.unassessed:
+        result.live_errors["assess"] = (
+            f"не удалась у {len(result.unassessed)} из {len(cands)} кандидатов: "
+            + ", ".join(result.unassessed[:5])
+        )
 
     # Видимость: ниже медианы пула — это перцентиль у BERTrend, посчитанный по
     # ЭТОМУ прогону. ⚠️ Сравнивать видимость между запросами нельзя: пулы разные.
@@ -1531,17 +2107,42 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     # (docs/lessons-and-gotchas.md, парадокс Симпсона).
     shares = [s.core_recent_share for s, _ in shown if s.core_recent_share is not None]
     prior = _median_float(shares)
+    stage("score")
     if score([s for s, _ in shown], say):
         shown.sort(key=lambda item: (-item[0].confidence, top_key(item[0], prior)))
     else:
         shown.sort(key=lambda item: top_key(item[0], prior))
+    if flags.LAYERS:
+        shown = _drop_trends(shown, result)
+    if flags.TECHNIQUE:
+        say(f"называю приём за направлением: {len(shown)}")
+        shown = _techniques(shown, result)
     if area_en:
         say("проверяю, о предмете запроса ли кандидаты")
-        shown = _on_topic(shown, area_en, result)
+        before = [s for s, _ in shown]
+        shown = _on_topic(shown, area_en, result, LAYER_POOL if flags.LAYERS else TOP)
+        for s in before:
+            if s.relevance is not None:
+                emit("relevance", {"label": s.label, "relevance": s.relevance,
+                                   "relevance_why": s.relevance_why})
+    if flags.LAYERS:
+        # Патенты слоя идут здесь, на весь пул — стадия объявляется тут же, иначе экран
+        # ожидания перескакивает с «этап 7» на «этап 9» (PQA-016).
+        stage("patents")
+        # ⚠️ Без срока бюджета (расходится с BR-33, 07 §8.6): срок срабатывает в большинстве
+        # прогонов стенда, а без патентов кандидат теряет подтверждение и уходит в
+        # «наблюдать» — состав ТОП сдвинулся бы против замера Big Tech 20 → 10, сделанного
+        # без срока. Включать — только с перемером ТОП.
+        shown = _split_layers(shown, result, say)
+        emit("patents", {"patents": {s.label: s.patents for s, _ in shown if s.patents}})
     # Не вошедшие в ТОП по месту (не по жанру) — отдельным списком: страница и бэктест
     # считают их контролем того же пула (прежде здесь были «без нескольких игроков»).
     result.thin = [s for s, _ in shown[TOP:]]
     shown = shown[:TOP]
+    emit(
+        "top",
+        {"labels": [s.label for s, _ in shown], "confidence": [s.confidence for s, _ in shown]},
+    )
 
     # Патенты — третий канал (docs/patents.md): счётчик активности по окнам и свежие
     # публикации с заявителем. Спрашиваются ТРЕМЯ решениями, и каждое стоит объяснить.
@@ -1555,13 +2156,41 @@ def run(store: Store, query: str, on_progress: ProgressHook = None) -> AskResult
     # ⚠️ И ПОСЛЕ проверок уверенности: патент — источник, который добавили мы сами, и
     # пускать его в «разные типы источников» значило бы завести проверку, проходящую по
     # построению (docs/todo.md §72). В балл он не идёт, в карточку и в таблицу — идёт.
-    attach_patents(shown, result.live_errors, say)
+    # Со слоями патенты уже посчитаны на весь их пул (`_split_layers`).
+    # ⚠️ Бюджет времени: патенты и углубление идут, пока после них остаётся резерв на
+    # карточки. Пропуск — с пометкой в `live_errors`: карточка без патентной строки иначе
+    # неотличима от карточки, у которой патентов нет.
+    cards_by = deadline - CARDS_RESERVE_S
+    if not flags.LAYERS:
+        stage("patents")
+        attach_patents(shown, result.live_errors, say, deadline=cards_by)
+        if flags.EXTRA_SOURCES:
+            attach_extra(shown, result.live_errors, say)
+        emit("patents", {"patents": {s.label: s.patents for s, _ in shown if s.patents}})
 
-    deepen_top(shown, result.live_errors, say)
-    for sig, _ in shown:
-        sig.stage = stage_floor(sig.stage, sig.judgments)
+    stage("cards")
+    if time.monotonic() + DEEPEN_MIN_S < cards_by:
+        deepen_top(shown, result.live_errors, say)
+    else:
+        result.live_errors["deepen"] = "аннотации не дочитывались: исчерпан бюджет времени запроса"
+    # Лестница — всем, кого видно в отчёте (BR-15), а не только ТОП: иначе у исключённых и
+    # «наблюдать» в JSON остаётся ступень модели, а пересобранный HTML (`page.from_json`)
+    # показывает лестницу — один отчёт с двумя стадиями.
+    for sig in [s for s, _ in shown] + result.excluded + result.thin + result.watch:
+        sig.stage = evidence_stage(sig.stage, sig.judgments)
     write_cards(shown, say)
-    russian_titles(result.excluded + result.thin, say)
+    russian_summaries([s for s, _ in shown], result.live_errors, say, deadline)
+    for sig, _ in shown:
+        emit("card", {"label": sig.label, "title": sig.title, "stage": sig.stage,
+                      "description": sig.description, "advantage": sig.advantage,
+                      "case": sig.case, "hypothesis": sig.hypothesis})
+    # Карточка без русского заголовка (сбой вызова или латинский «перевод») — в тот же
+    # перевод названий, что и исключённые (NFR-01, PQA-004).
+    latin_top = [s for s, _ in shown if not card_mod.has_cyrillic(s.title)]
+    rest = result.excluded + result.thin + result.watch
+    russian_titles(rest + latin_top, say)
+    rest += latin_top
+    emit("titles", {"titles": {s.label: s.title for s in rest if s.title != s.label}})
     result.signals = [s for s, _ in shown]
     result.seconds = (datetime.now(UTC) - t0).total_seconds()
     say("готово")

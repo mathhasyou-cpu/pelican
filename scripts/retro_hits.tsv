@@ -1,0 +1,27 @@
+tech	aliases	cut	query	domain	why
+Трансформеры и self-attention	transformer|self-attention|attention is all you need|multi-head attention	2017-12-01	технологии в ИИ	ИИ	Vaswani et al., arXiv:1706.03762 (июнь 2017); тест экспертов «увидеть Attention в 2018»
+Предобучение языковых моделей (BERT)	bert|language model pre-training|pretrained language model|masked language model	2018-12-01	технологии в ИИ	ИИ	Devlin et al., arXiv:1810.04805 (октябрь 2018)
+Графовые нейросети	graph neural network|graph convolutional|gnn|message passing neural	2017-12-01	технологии в ИИ	ИИ	Kipf & Welling, arXiv:1609.02907; взлёт 2018–2020
+Федеративное обучение	federated learning|federated averaging|federated optimization	2017-12-01	технологии в ИИ	ИИ	McMahan et al., arXiv:1602.05629; взлёт 2019–2021
+Vision Transformer	vision transformer|vit|image transformer	2020-12-15	технологии в ИИ	ИИ	Dosovitskiy et al., arXiv:2010.11929 (октябрь 2020)
+Диффузионные модели	diffusion model|denoising diffusion|score-based generative|score matching	2020-12-15	технологии в ИИ	ИИ	Ho et al., arXiv:2006.11239 (июнь 2020); бум 2022
+Неявные нейронные поля (NeRF)	neural radiance field|nerf|implicit neural representation	2020-12-15	компьютерное зрение	ИИ	Mildenhall et al., arXiv:2003.08934 (март 2020)
+Контрастное самообучение	contrastive learning|self-supervised|simclr|momentum contrast	2020-06-01	компьютерное зрение	ИИ	Chen et al., arXiv:2002.05709; He et al., arXiv:1911.05722
+Генерация с поиском (RAG)	retrieval-augmented|retrieval augmented generation|retrieval-enhanced	2021-03-01	технологии в ИИ	ИИ	Lewis et al., arXiv:2005.11401 (май 2020); бум 2023
+Обучение по обратной связи человека (RLHF)	human feedback|rlhf|preference learning|reward model	2021-03-01	технологии в ИИ	ИИ	Stiennon et al., arXiv:2009.01325 (сентябрь 2020); бум 2023
+Разреженные смеси экспертов	mixture of experts|mixture-of-experts|sparse expert|switch transformer	2021-06-01	технологии в ИИ	ИИ	Fedus et al., arXiv:2101.03961 (январь 2021)
+Низкоранговая адаптация (LoRA)	low-rank adaptation|lora|parameter-efficient fine-tuning|adapter	2022-03-01	технологии в ИИ	ИИ	Hu et al., arXiv:2106.09685 (июнь 2021); бум 2023
+Цепочка рассуждений (chain-of-thought)	chain-of-thought|chain of thought|step-by-step reasoning	2022-09-01	технологии в ИИ	ИИ	Wei et al., arXiv:2201.11903 (январь 2022)
+Модели пространства состояний (S4, Mamba)	state space model|structured state space|s4|selective state space	2022-09-01	технологии в ИИ	ИИ	Gu et al., arXiv:2111.00396 (ноябрь 2021); Mamba 2023
+Редактирование генома CRISPR-Cas9	crispr|cas9|genome editing	2013-12-01	биотехнологии	биотех	Jinek et al., Science 2012; Cong et al., Science 2013
+Редактирование оснований (base editing)	base editing|base editor|prime editing	2017-12-01	биотехнологии	биотех	Komor et al., Nature 2016; prime editing 2019
+Органоиды	organoid|organ-on-a-chip|organ on chip	2014-12-01	биотехнологии	биотех	Lancaster et al., Nature 2013; «микрофлюидика» — пример уровня от экспертов
+Секвенирование единичных клеток	single-cell rna|single-cell sequencing|scrna-seq	2015-12-01	биотехнологии	биотех	Drop-seq / inDrop, Cell 2015
+мРНК-вакцины и липидные наночастицы	mrna vaccine|lipid nanoparticle|mrna therapeutic|modified mrna	2018-12-01	биотехнологии	биотех	взлёт 2020; доклиника и фаза I до 2019
+Предсказание структуры белка глубоким обучением	protein structure prediction|protein folding|alphafold|structure prediction	2019-12-01	биотехнологии	биотех	AlphaFold, CASP13 (декабрь 2018); AlphaFold 2 — 2020
+Перовскитные солнечные элементы	perovskite solar|perovskite photovoltaic|halide perovskite	2013-12-01	перспективная энергетика	энергетика	Lee et al., Science 2012; Liu et al., Nature 2013
+Твердотельные аккумуляторы	solid-state battery|solid electrolyte|sulfide electrolyte|solid-state electrolyte	2016-12-01	перспективная энергетика	энергетика	Kato et al., Nature Energy 2016
+Натрий-ионные аккумуляторы	sodium-ion|na-ion battery|sodium ion battery	2019-12-01	перспективная энергетика	энергетика	серийное производство CATL с 2021–2023
+Квантовая коррекция ошибок на поверхностном коде	surface code|quantum error correction|logical qubit	2018-12-01	квантовые технологии	квант	Fowler et al. 2012; демонстрации логических кубитов 2021–2024
+Нейроморфные вычисления на мемристорах	memristor|neuromorphic|in-memory computing|resistive switching	2016-12-01	перспективные вычисления	электроника	Prezioso et al., Nature 2015
+Нейроинтерфейсы высокой плотности	neuropixels|high-density neural|brain-computer interface|neural probe	2017-12-01	нейротехнологии	нейро	Jun et al., Nature 2017 (Neuropixels); «нейросенсорика» — пример уровня от экспертов

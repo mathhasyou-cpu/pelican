@@ -13,16 +13,19 @@
 
 Отсюда три уровня: `high` (наука, государство, университеты), `medium`
 (профессиональные отраслевые медиа, вендоры), `low` (пресс-релизы, блоги, соцсети,
-агрегаторы).
+агрегаторы) — и четвёртый, `unknown`: домена нет в списках.
 
-⚠️ **Неизвестный домен — `medium`, а не `high`.** Длинный хвост издателей Google News
-состоит из отраслевых медиа, но и из перепечаток; поднимать безымянное до доверенного
-значило бы сделать правило ТЗ обходимым любым новым доменом. Опускать до `low` тоже
-нельзя: тогда почти любая карточка с медиа-подтверждением выглядела бы неподтверждённой.
+⚠️ **Неизвестный домен — `unknown`, а не `medium` и не `high`.** Длинный хвост
+издателей Google News состоит из отраслевых медиа, но и из перепечаток; поднимать
+безымянное до доверенного значило бы сделать правило ТЗ обходимым любым новым доменом,
+а «средняя» на странице утверждала бы оценку, которой не было. Тип у него — медиа: в
+проверку «разные типы источников» он идёт как медиа.
 
-⚠️ **Правило ТЗ проверяется на карточке, а не на источнике** (`corroborated`):
-технология без единого источника выше `low` в выдачу не идёт — или идёт с отметкой
-о пониженной доверенности.
+⚠️ **Правило ТЗ проверяется на карточке, а не на источнике** (`corroborated`): нужен
+хотя бы один ИЗВЕСТНЫЙ источник выше `low`. Неизвестный домен основанием не считается.
+Замер на 203 карточках стенда: ни одна не держалась на одних неизвестных доменах — у
+каждой есть работа корпуса, — так что правило меняет пометку только у карточек без науки.
+Список медиа дополнен самыми частыми неизвестными доменами тех же отчётов.
 """
 
 from __future__ import annotations
@@ -33,8 +36,9 @@ from urllib.parse import urlparse
 HIGH = "high"
 MEDIUM = "medium"
 LOW = "low"
+UNKNOWN_LEVEL = "unknown"
 
-LEVEL_LABELS = {HIGH: "высокая", MEDIUM: "средняя", LOW: "пониженная"}
+LEVEL_LABELS = {HIGH: "высокая", MEDIUM: "средняя", LOW: "пониженная", UNKNOWN_LEVEL: "не оценена"}
 
 SCIENCE = "научная публикация"
 PREPRINT = "препринт"
@@ -73,6 +77,15 @@ _EXACT: dict[str, Trust] = {
     "new.fips.ru": Trust(PATENT, HIGH),
     "arxiv.org": Trust(PREPRINT, HIGH),
     "export.arxiv.org": Trust(PREPRINT, HIGH),
+    # Препринты наук о жизни и химии (`weak.extra`, через Europe PMC). Как у arXiv —
+    # препринт, а не медиа: иначе «разные типы источников» считали бы их рынком.
+    "biorxiv.org": Trust(PREPRINT, HIGH),
+    "medrxiv.org": Trust(PREPRINT, HIGH),
+    "chemrxiv.org": Trust(PREPRINT, HIGH),
+    "researchsquare.com": Trust(PREPRINT, HIGH),
+    "preprints.org": Trust(PREPRINT, HIGH),
+    "ssrn.com": Trust(PREPRINT, HIGH),
+    "europepmc.org": Trust(SCIENCE, HIGH),
     "openalex.org": Trust(SCIENCE, HIGH),
     "doi.org": Trust(SCIENCE, HIGH),
     "nature.com": Trust(SCIENCE, HIGH),
@@ -83,6 +96,44 @@ _EXACT: dict[str, Trust] = {
     "ieeexplore.ieee.org": Trust(SCIENCE, HIGH),
     "dl.acm.org": Trust(SCIENCE, HIGH),
     "mdpi.com": Trust(SCIENCE, HIGH),
+    # Частые неизвестные домены отчётов стенда (замер 19 отчётов, 1012 вхождений).
+    "frontiersin.org": Trust(SCIENCE, HIGH),
+    "ojs.aaai.org": Trust(SCIENCE, HIGH),
+    "onlinelibrary.wiley.com": Trust(SCIENCE, HIGH),
+    "advanced.onlinelibrary.wiley.com": Trust(SCIENCE, HIGH),
+    "pubs.acs.org": Trust(SCIENCE, HIGH),
+    "ahajournals.org": Trust(SCIENCE, HIGH),
+    "alphaxiv.org": Trust(PREPRINT, HIGH),
+    "eurekalert.org": Trust(PRESS, LOW),
+    "fortune.com": Trust(MEDIA, MEDIUM),
+    "cnbc.com": Trust(MEDIA, MEDIUM),
+    "forbes.com": Trust(MEDIA, MEDIUM),
+    "wsj.com": Trust(MEDIA, MEDIUM),
+    "businessinsider.com": Trust(MEDIA, MEDIUM),
+    "axios.com": Trust(MEDIA, MEDIUM),
+    "statnews.com": Trust(MEDIA, MEDIUM),
+    "calcalistech.com": Trust(MEDIA, MEDIUM),
+    "industrialcyber.co": Trust(MEDIA, MEDIUM),
+    "mobihealthnews.com": Trust(MEDIA, MEDIUM),
+    "genengnews.com": Trust(MEDIA, MEDIUM),
+    "fintech.global": Trust(MEDIA, MEDIUM),
+    "finovate.com": Trust(MEDIA, MEDIUM),
+    "fintechfutures.com": Trust(MEDIA, MEDIUM),
+    "thequantuminsider.com": Trust(MEDIA, MEDIUM),
+    "helpnetsecurity.com": Trust(MEDIA, MEDIUM),
+    "biopharmadive.com": Trust(MEDIA, MEDIUM),
+    "tomshardware.com": Trust(MEDIA, MEDIUM),
+    "aws.amazon.com": Trust(VENDOR, MEDIUM),
+    "developer.nvidia.com": Trust(VENDOR, MEDIUM),
+    "nvidianews.nvidia.com": Trust(VENDOR, MEDIUM),
+    "microsoft.com": Trust(VENDOR, MEDIUM),
+    "news.microsoft.com": Trust(VENDOR, MEDIUM),
+    "machinelearning.apple.com": Trust(VENDOR, MEDIUM),
+    "research.google": Trust(VENDOR, MEDIUM),
+    "ibm.com": Trust(VENDOR, MEDIUM),
+    "app.dealroom.co": Trust(BLOG, LOW),
+    "startupfortune.com": Trust(BLOG, LOW),
+    "marktechpost.com": Trust(BLOG, LOW),
     "cyberleninka.ru": Trust(SCIENCE, HIGH),
     "elibrary.ru": Trust(SCIENCE, HIGH),
     "ieee.org": Trust(ASSOCIATION, HIGH),
@@ -150,8 +201,8 @@ _ZONES: tuple[tuple[str, Trust], ...] = (
     (".int", Trust(ASSOCIATION, HIGH)),
 )
 
-#: Неизвестный домен. ⚠️ `medium`, а не `high` — см. докстринг модуля.
-UNKNOWN = Trust(MEDIA, MEDIUM)
+#: Неизвестный домен: тип — медиа, уровень — `unknown` (см. докстринг модуля).
+UNKNOWN = Trust(MEDIA, UNKNOWN_LEVEL)
 
 
 def domain_of(url: str) -> str:
@@ -173,9 +224,11 @@ def classify(url: str) -> Trust:
 
 
 def corroborated(levels: list[str]) -> bool:
-    """Правило ТЗ: есть ли хоть один источник выше пониженной доверенности.
+    """Правило ТЗ: есть ли хоть один ИЗВЕСТНЫЙ источник выше пониженной доверенности.
 
     ⚠️ На вход — уровни, уже посчитанные по домену ИЗДАТЕЛЯ (`Source.trust`), а не ссылки:
     у Google News ссылка — переадресация `news.google.com`, и по ней уровень не считается.
+    ⚠️ Неизвестный домен основанием не считается: иначе правило проходило при
+    единственной перепечатке с безымянного сайта (PEL-H-07).
     """
-    return any(level != LOW for level in levels)
+    return any(level in (HIGH, MEDIUM) for level in levels)

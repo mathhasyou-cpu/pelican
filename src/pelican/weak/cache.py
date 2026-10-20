@@ -40,7 +40,8 @@ TTL_S = 24 * 3600
 #: Выключается на время нулевого контроля и флагом `--fresh`.
 ENABLED = True
 
-_swept = False
+#: Когда (`time.time()`) каталог чистился последний раз; 0 — ещё ни разу в процессе.
+_swept_at = 0.0
 
 
 def key_of(kind: str, query: str) -> str:
@@ -84,12 +85,17 @@ def save(kind: str, query: str, docs: list[LiveDoc]) -> None:
 
 
 def _sweep() -> None:
-    """Просроченное убирается один раз за процесс: каталог растёт запросами навсегда."""
-    global _swept
-    if _swept:
+    """Просроченное убирается раз в `TTL_S`: каталог растёт запросами навсегда.
+
+    ⚠️ Не раз за процесс: API живёт неделями, и каталог рос бы сотнями файлов в день до
+    перезапуска (PEL-H-10).
+    """
+    global _swept_at
+    now = time.time()
+    if now - _swept_at < TTL_S:
         return
-    _swept = True
-    limit = time.time() - TTL_S
+    _swept_at = now
+    limit = now - TTL_S
     try:
         for f in DIR.glob("*.json"):
             if f.stat().st_mtime < limit:
